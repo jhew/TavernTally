@@ -15,8 +15,10 @@ jobs:
         with: 
           dotnet-version: '8.0.x'
       
-      - name: Install WiX 4 CLI
-        run: dotnet tool install --global wix --version 4.0.5
+      - name: Install WiX 4 CLI and Extensions
+        run: |
+          dotnet tool install --global wix --version 4.0.5
+          dotnet add ./installer/installer.wixproj package WixToolset.UI.wixext --version 4.0.5
       
       - name: Restore dependencies
         run: dotnet restore
@@ -42,16 +44,17 @@ jobs:
       - name: Create installer directory structure
         run: |
           New-Item -ItemType Directory -Force -Path "./installer-build"
+          New-Item -ItemType Directory -Force -Path "./artifacts"
           Copy-Item "./publish/*" "./installer-build/" -Recurse -Force
           Copy-Item "./assets/app.ico" "./installer-build/" -Force
       
       - name: Build MSI installer
         run: |
-          wix build ./installer/installer.wixproj `
-            -ext WixToolset.UI.wixext `
-            -d SourceDir="./installer-build" `
-            -d Version="1.0.${{ github.run_number }}" `
-            -o "./artifacts/TavernTally-v1.0.${{ github.run_number }}.msi"
+          dotnet build ./installer/installer.wixproj `
+            -c Release `
+            -p:SourceDir="$(Get-Location)/installer-build" `
+            -p:Version="1.0.${{ github.run_number }}" `
+            -p:OutputPath="$(Get-Location)/artifacts/"
       
       - name: Create portable ZIP
         run: |
