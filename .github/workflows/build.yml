@@ -50,9 +50,9 @@ jobs:
         run: |
           dotnet build ./installer/installer.wixproj `
             -c Release `
-            -p:SourceDir="$(Get-Location)/installer-build" `
+            -p:SourceDir="$(Get-Location)\installer-build" `
             -p:Version="1.0.${{ github.run_number }}" `
-            -p:OutputPath="$(Get-Location)/artifacts/"
+            -p:OutputPath="$(Get-Location)\artifacts\"
       
       - name: Create portable ZIP
         run: |

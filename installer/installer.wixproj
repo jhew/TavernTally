@@ -7,6 +7,11 @@
     <OutputName>TavernTally</OutputName>
     <ProductVersion>1.0.0</ProductVersion>
     <PackageVersion>$(ProductVersion)</PackageVersion>
+    <!-- Set default values if not provided -->
+    <SourceDir Condition="'$(SourceDir)' == ''">.\</SourceDir>
+    <Version Condition="'$(Version)' == ''">$(ProductVersion)</Version>
+    <!-- Define WiX preprocessor variables -->
+    <DefineConstants>SourceDir=$(SourceDir);Version=$(Version);$(DefineConstants)</DefineConstants>
   </PropertyGroup>
   
   <ItemGroup>
