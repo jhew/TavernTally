@@ -76,7 +76,8 @@
             "Serilog.Sinks.Async": "1.5.0",
             "Serilog.Sinks.File": "5.0.0",
             "System.Text.Json": "8.0.5",
-            "WixToolset.Sdk": "4.0.5"
+            "WixToolset.Sdk": "4.0.5",
+            "WixToolset.UI.wixext": "4.0.5"
           },
           "imports": [
             "net461",

@@ -18,6 +18,7 @@
 
     <!-- Optional: Build MSI inside MSBuild (if you choose; otherwise you can keep using wix CLI) -->
     <PackageVersion Include="WixToolset.Sdk" Version="4.0.5" />
+    <PackageVersion Include="WixToolset.UI.wixext" Version="4.0.5" />
   </ItemGroup>
 
   <!-- (Optional) lock transitive packages once you’re stable:
