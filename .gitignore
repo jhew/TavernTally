@@ -1,0 +1,38 @@
+# Build results
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+
+# Visual Studio files
+.vs/
+*.user
+*.suo
+*.userprefs
+*.vspscc
+*.vssscc
+
+# Build artifacts
+*.dll
+*.exe
+*.pdb
+*.cache
+*.log
+
+# NuGet packages
+packages/
+*.nupkg
+
+# MSBuild
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# WiX build artifacts
+installer/bin/
+installer/obj/
+installer-build/
+
+# OS files
+.DS_Store
+Thumbs.db
