@@ -1,116 +1,31 @@
-<?xml version="1.0" encoding="UTF-8"?>
+﻿<?xml version="1.0" encoding="UTF-8"?>
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
-  <Product Id="*"
-           Name="TavernTally"
-           Language="1033"
+  <Package Name="TavernTally"
            Version="$(var.Version)"
            Manufacturer="TavernTally Project"
            UpgradeCode="A1B2C3D4-E5F6-7890-ABCD-123456789012">
-    
-    <Package InstallerVersion="500" Compressed="yes" InstallScope="perUser" 
-             Description="TavernTally - Hearthstone Battlegrounds Overlay"
-             Comments="Overlay application for tracking Hearthstone Battlegrounds matches" />
 
+    <MajorUpgrade DowngradeErrorMessage="A newer version is already installed." />
     <MediaTemplate EmbedCab="yes" />
 
-    <MajorUpgrade AllowDowngrades="no" 
-                  DowngradeErrorMessage="A newer version of TavernTally is already installed." />
+    <StandardDirectory Id="LocalAppDataFolder">
+      <Directory Id="INSTALLFOLDER" Name="TavernTally" />
+    </StandardDirectory>
 
-    <!-- Main Feature -->
-    <Feature Id="MainFeature" Title="TavernTally" Level="1" Description="Main application files">
-      <ComponentGroupRef Id="AppFiles"/>
-      <ComponentRef Id="AppShortcut"/>
-      <ComponentRef Id="DesktopShortcut"/>
+    <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
+      <Component>
+        <File Source="$(var.SourceDir)\TavernTally.App.exe" />
+      </Component>
+      <Component>
+        <File Source="$(var.SourceDir)\app.ico" />
+      </Component>
+    </ComponentGroup>
+
+    <Feature Id="ProductFeature" Title="TavernTally" Level="1">
+      <ComponentGroupRef Id="ProductComponents" />
     </Feature>
 
-    <!-- Directory structure -->
-    <Directory Id="TARGETDIR" Name="SourceDir">
-      <Directory Id="LocalAppDataFolder">
-        <Directory Id="INSTALLDIR" Name="TavernTally" />
-      </Directory>
-      <Directory Id="ProgramMenuFolder">
-        <Directory Id="AppShortcutDir" Name="TavernTally" />
-      </Directory>
-      <Directory Id="DesktopFolder" />
-    </Directory>
+    <ui:WixUI Id="WixUI_Minimal" />
 
-    <!-- Application files -->
-    <DirectoryRef Id="INSTALLDIR">
-      <ComponentGroup Id="AppFiles">
-        <Component Id="MainApp" Guid="A1B2C3D4-1111-2222-3333-444444444444">
-          <File Id="TavernTallyExe" 
-                Source="$(var.SourceDir)\TavernTally.App.exe" 
-                KeyPath="yes" 
-                Name="TavernTally.App.exe">
-            <Shortcut Id="DesktopShortcutFile"
-                      Directory="DesktopFolder"
-                      Name="TavernTally"
-                      Description="TavernTally - Hearthstone Battlegrounds Overlay"
-                      Icon="AppIcon"
-                      WorkingDirectory="INSTALLDIR" />
-          </File>
-        </Component>
-        
-        <!-- Include app.ico file -->
-        <Component Id="AppIcon" Guid="A1B2C3D4-5555-6666-7777-888888888888">
-          <File Id="AppIconFile" 
-                Source="$(var.SourceDir)\app.ico" 
-                KeyPath="yes" />
-        </Component>
-        
-        <!-- Include any additional DLLs if needed -->
-        <Component Id="RuntimeFiles" Guid="A1B2C3D4-9999-AAAA-BBBB-CCCCCCCCCCCC">
-          <File Id="RuntimeDll" 
-                Source="$(var.SourceDir)\*.dll" 
-                KeyPath="yes" />
-        </Component>
-      </ComponentGroup>
-    </DirectoryRef>
-
-    <!-- Start Menu shortcut -->
-    <DirectoryRef Id="AppShortcutDir">
-      <Component Id="AppShortcut" Guid="A1B2C3D4-DDDD-EEEE-FFFF-000000000000">
-        <Shortcut Id="StartMenuShortcut"
-                  Name="TavernTally"
-                  Description="TavernTally - Hearthstone Battlegrounds Overlay"
-                  Target="[INSTALLDIR]TavernTally.App.exe"
-                  WorkingDirectory="INSTALLDIR"
-                  Icon="AppIcon" />
-        <RemoveFolder Id="RemoveAppShortcutDir" On="uninstall" />
-        <RegistryValue Root="HKCU" 
-                       Key="Software\TavernTally" 
-                       Name="StartMenuShortcut" 
-                       Type="integer" 
-                       Value="1" 
-                       KeyPath="yes"/>
-      </Component>
-    </DirectoryRef>
-
-    <!-- Desktop shortcut component -->
-    <DirectoryRef Id="INSTALLDIR">
-      <Component Id="DesktopShortcut" Guid="A1B2C3D4-1111-3333-5555-777777777777">
-        <RegistryValue Root="HKCU" 
-                       Key="Software\TavernTally" 
-                       Name="DesktopShortcut" 
-                       Type="integer" 
-                       Value="1" 
-                       KeyPath="yes"/>
-      </Component>
-    </DirectoryRef>
-
-    <!-- Icon definition -->
-    <Icon Id="AppIcon" SourceFile="$(var.SourceDir)\app.ico"/>
-    
-    <!-- Add to Add/Remove Programs -->
-    <Property Id="ARPPRODUCTICON" Value="AppIcon" />
-    <Property Id="ARPHELPLINK" Value="https://github.com/jhew/TavernTally" />
-    
-    <!-- UI -->
-    <UIRef Id="WixUI_InstallDir" />
-    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLDIR" />
-    
-    <!-- License (optional - can be removed if not needed) -->
-    <WixVariable Id="WixUILicenseRtf" Value="License.rtf" Overridable="yes" />
-    
-  </Product>
+  </Package>
 </Wix>

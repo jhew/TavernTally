@@ -1,18 +1,20 @@
 # Installation Instructions
 
-## 📦 Easy Installation (Recommended)
+## 📦 Easy Installation
 
-### Option 1: MSI Installer
-1. Go to [Releases](https://github.com/jhew/TavernTally/releases)
-2. Download the latest `TavernTally-v*.msi` file
-3. Run the installer and follow the setup wizard
-4. Launch TavernTally from Start Menu or Desktop
-
-### Option 2: Portable Version
+### Portable Version (Recommended)
 1. Go to [Releases](https://github.com/jhew/TavernTally/releases)
 2. Download the latest `TavernTally-Portable-v*.zip` file  
-3. Extract to any folder
+3. Extract to any folder (e.g., `C:\TavernTally\` or `Desktop\TavernTally\`)
 4. Run `TavernTally.App.exe`
+5. **No installation required!** - Just extract and run
+
+### Benefits of Portable Version:
+- ✅ **No installer needed** - Just download and run
+- ✅ **No admin rights required** - Runs from any folder
+- ✅ **Easy updates** - Just replace with new version
+- ✅ **Easy removal** - Just delete the folder
+- ✅ **Self-contained** - All dependencies included
 
 ## 🎮 First Run Setup
 1. TavernTally will automatically detect your Hearthstone installation
@@ -28,5 +30,8 @@ If automatic setup fails:
 
 ## 📋 Requirements
 - Windows 10/11 (64-bit)
-- .NET 8 Runtime (included in installer)
+- .NET 8 Runtime (included in portable version)
 - Hearthstone installed and accessible
+
+## 🚀 Future Plans
+- MSI installer coming soon for users who prefer traditional installation

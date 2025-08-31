@@ -46,13 +46,14 @@ jobs:
           Copy-Item "./publish/*" "./installer-build/" -Recurse -Force
           Copy-Item "./assets/app.ico" "./installer-build/" -Force
       
-      - name: Build MSI installer
-        run: |
-          dotnet build ./installer/installer.wixproj `
-            -c Release `
-            -p:SourceDir="$(Get-Location)\installer-build" `
-            -p:Version="1.0.${{ github.run_number }}" `
-            -p:OutputPath="$(Get-Location)\artifacts\"
+      # Skip MSI build for now due to WiX 4 complexity
+      # - name: Build MSI installer
+      #   run: |
+      #     dotnet build ./installer/installer.wixproj `
+      #       -c Release `
+      #       -p:SourceDir="$(Get-Location)\installer-build" `
+      #       -p:Version="1.0.${{ github.run_number }}" `
+      #       -p:OutputPath="$(Get-Location)\artifacts\"
       
       - name: Create portable ZIP
         run: |
@@ -63,7 +64,6 @@ jobs:
         with:
           name: TavernTally-Release-v1.0.${{ github.run_number }}
           path: |
-            ./artifacts/*.msi
             ./artifacts/*.zip
           retention-days: 90
       
@@ -73,7 +73,6 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            ./artifacts/*.msi
             ./artifacts/*.zip
           draft: false
           prerelease: false
