@@ -1,9 +1,19 @@
 using System;
 using System.Threading;
 using System.Windows.Forms;
+using Serilog;
 
 namespace TavernTally.App
 {
+    // Note: This file contains legacy WinForms-based tray implementation
+    // Current application uses WPF with TrayIcon.cs instead
+    
+    /// <summary>
+    /// Legacy tray application context - not currently used
+    /// Keeping for reference/backup purposes
+    /// Current implementation is in TrayIcon.cs (WPF-based)
+    /// </summary>
+    [Obsolete("This class is not used in current implementation. Use TrayIcon.cs instead.")]
     public class Tray
     {
         // Main method removed - using WPF App.xaml as entry point instead
@@ -78,16 +88,16 @@ namespace TavernTally.App
 
         public void Enable()
         {
-            // TODO: attach overlay / start numbering
             IsEnabled = true;
-            // e.g., OverlayService.Instance.Show();
+            // Note: Overlay enabling is handled by OverlayWindow based on settings
+            Log.Debug("Overlay controller enabled");
         }
 
         public void Disable()
         {
-            // TODO: detach overlay / stop numbering
             IsEnabled = false;
-            // e.g., OverlayService.Instance.Hide();
+            // Note: Overlay disabling is handled by OverlayWindow based on settings
+            Log.Debug("Overlay controller disabled");
         }
     }
 }

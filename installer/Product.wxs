@@ -1,49 +1,31 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
-  <Product Id="*"
-           Name="TavernTally"
-           Language="1033"
-           Version="1.0.0"
-           Manufacturer="YourName"
-           UpgradeCode="PUT-GUID-HERE-1111-2222-3333-444444444444">
-    <Package InstallerVersion="500" Compressed="yes" InstallScope="perUser" />
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+  <Package Name="TavernTally"
+           Version="$(var.Version)"
+           Manufacturer="TavernTally Project"
+           UpgradeCode="A1B2C3D4-E5F6-7890-ABCD-123456789012">
 
-    <MediaTemplate />
+    <MajorUpgrade DowngradeErrorMessage="A newer version is already installed." />
+    <MediaTemplate EmbedCab="yes" />
 
-    <MajorUpgrade AllowDowngrades="no" DowngradeErrorMessage="A newer version is already installed." />
-    <Feature Id="MainFeature" Title="TavernTally" Level="1">
-      <ComponentGroupRef Id="AppFiles"/>
+    <StandardDirectory Id="LocalAppDataFolder">
+      <Directory Id="INSTALLFOLDER" Name="TavernTally" />
+    </StandardDirectory>
+
+    <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
+      <Component>
+        <File Source="$(var.SourceDir)\TavernTally.App.exe" />
+      </Component>
+      <Component>
+        <File Source="$(var.SourceDir)\app.ico" />
+      </Component>
+    </ComponentGroup>
+
+    <Feature Id="ProductFeature" Title="TavernTally" Level="1">
+      <ComponentGroupRef Id="ProductComponents" />
     </Feature>
 
-    <Directory Id="TARGETDIR" Name="SourceDir">
-      <Directory Id="LocalAppDataFolder">
-        <Directory Id="INSTALLDIR" Name="TavernTally" />
-      </Directory>
-      <Directory Id="ProgramMenuFolder">
-        <Directory Id="AppShortcutDir" Name="TavernTally" />
-      </Directory>
-    </Directory>
+    <ui:WixUI Id="WixUI_Minimal" />
 
-    <DirectoryRef Id="INSTALLDIR">
-      <ComponentGroup Id="AppFiles">
-        <Component Id="AppExe" Guid="PUT-GUID-HERE-AAAA-BBBB-CCCC-DDDDDDDDDDDD">
-          <File Id="OverlayExe" Source="$(var.Overlay.App.TargetDir)Overlay.App.exe" KeyPath="yes" />
-          <File Id="ConfigJson" Source="$(var.ProjectDir)src\Overlay.App\Defaults\config.json" />
-        </Component>
-      </ComponentGroup>
-    </DirectoryRef>
-
-    <DirectoryRef Id="AppShortcutDir">
-      <Component Id="AppShortcut" Guid="PUT-GUID-HERE-EEEE-FFFF-0000-111111111111">
-        <Shortcut Id="StartMenuShortcut"
-                  Name="TavernTally"
-                  Target="[INSTALLDIR]Overlay.App.exe"
-                  WorkingDirectory="INSTALLDIR"
-                  Icon="AppIco" />
-        <RegistryValue Root="HKCU" Key="Software\jhew\TavernTally" Name="installed" Type="integer" Value="1" KeyPath="yes"/>
-      </Component>
-    </DirectoryRef>
-
-    <Icon Id="AppIco" SourceFile="$(var.ProjectDir)assets\app.ico"/>
-  </Product>
+  </Package>
 </Wix>
