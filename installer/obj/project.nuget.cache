@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "dgSpecHash": "GVWSIdl+V+Y=",
+  "success": true,
+  "projectFilePath": "C:\\Users\\jehew\\TavernTally\\installer\\installer.wixproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\jehew\\.nuget\\packages\\wixtoolset.ui.wixext\\4.0.5\\wixtoolset.ui.wixext.4.0.5.nupkg.sha512"
+  ],
+  "logs": []
+}

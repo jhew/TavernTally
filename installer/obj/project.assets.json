@@ -1,0 +1,90 @@
+{
+  "version": 3,
+  "targets": {
+    "native,Version=v0.0": {
+      "WixToolset.UI.wixext/4.0.5": {
+        "type": "package",
+        "build": {
+          "build/WixToolset.UI.wixext.targets": {}
+        }
+      }
+    }
+  },
+  "libraries": {
+    "WixToolset.UI.wixext/4.0.5": {
+      "sha512": "9j0qQ0cZ6GdI5bdYPHuhafqmrhbHKoni1zIqv3hPBdLt4YK5xhQJavTpwRdb1FwrW9KIi5ItI3RkTet41v/97A==",
+      "type": "package",
+      "path": "wixtoolset.ui.wixext/4.0.5",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "build/WixToolset.UI.wixext.targets",
+        "wix.png",
+        "wixext4/WixToolset.UI.wixext.dll",
+        "wixtoolset.ui.wixext.4.0.5.nupkg.sha512",
+        "wixtoolset.ui.wixext.nuspec"
+      ]
+    }
+  },
+  "projectFileDependencyGroups": {
+    "native,Version=v0.0": [
+      "WixToolset.UI.wixext >= 4.0.5"
+    ]
+  },
+  "packageFolders": {
+    "C:\\Users\\jehew\\.nuget\\packages\\": {}
+  },
+  "project": {
+    "version": "1.0.0",
+    "restore": {
+      "projectUniqueName": "C:\\Users\\jehew\\TavernTally\\installer\\installer.wixproj",
+      "projectName": "TavernTally",
+      "projectPath": "C:\\Users\\jehew\\TavernTally\\installer\\installer.wixproj",
+      "packagesPath": "C:\\Users\\jehew\\.nuget\\packages\\",
+      "outputPath": "C:\\Users\\jehew\\TavernTally\\installer\\obj\\",
+      "projectStyle": "PackageReference",
+      "centralPackageVersionsManagementEnabled": true,
+      "configFilePaths": [
+        "C:\\Users\\jehew\\AppData\\Roaming\\NuGet\\NuGet.Config"
+      ],
+      "originalTargetFrameworks": [
+        "net48"
+      ],
+      "sources": {
+        "https://api.nuget.org/v3/index.json": {}
+      },
+      "frameworks": {
+        "native": {
+          "targetAlias": "net48",
+          "projectReferences": {}
+        }
+      },
+      "restoreAuditProperties": {
+        "enableAudit": "true",
+        "auditLevel": "low",
+        "auditMode": "direct"
+      }
+    },
+    "frameworks": {
+      "native": {
+        "targetAlias": "net48",
+        "dependencies": {
+          "WixToolset.UI.wixext": {
+            "target": "Package",
+            "version": "[4.0.5, )",
+            "versionCentrallyManaged": true
+          }
+        },
+        "centralPackageVersions": {
+          "Serilog": "3.1.1",
+          "Serilog.Extensions.Logging": "8.0.0",
+          "Serilog.Sinks.Async": "1.5.0",
+          "Serilog.Sinks.File": "5.0.0",
+          "System.Text.Json": "8.0.5",
+          "WixToolset.Sdk": "4.0.5",
+          "WixToolset.UI.wixext": "4.0.5"
+        }
+      }
+    }
+  }
+}

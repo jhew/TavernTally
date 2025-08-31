@@ -1,0 +1,61 @@
+{
+  "format": 1,
+  "restore": {
+    "C:\\Users\\jehew\\TavernTally\\installer\\installer.wixproj": {}
+  },
+  "projects": {
+    "C:\\Users\\jehew\\TavernTally\\installer\\installer.wixproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "C:\\Users\\jehew\\TavernTally\\installer\\installer.wixproj",
+        "projectName": "TavernTally",
+        "projectPath": "C:\\Users\\jehew\\TavernTally\\installer\\installer.wixproj",
+        "packagesPath": "C:\\Users\\jehew\\.nuget\\packages\\",
+        "outputPath": "C:\\Users\\jehew\\TavernTally\\installer\\obj\\",
+        "projectStyle": "PackageReference",
+        "centralPackageVersionsManagementEnabled": true,
+        "configFilePaths": [
+          "C:\\Users\\jehew\\AppData\\Roaming\\NuGet\\NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net48"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "native": {
+            "targetAlias": "net48",
+            "projectReferences": {}
+          }
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        }
+      },
+      "frameworks": {
+        "native": {
+          "targetAlias": "net48",
+          "dependencies": {
+            "WixToolset.UI.wixext": {
+              "target": "Package",
+              "version": "[4.0.5, )",
+              "versionCentrallyManaged": true
+            }
+          },
+          "centralPackageVersions": {
+            "Serilog": "3.1.1",
+            "Serilog.Extensions.Logging": "8.0.0",
+            "Serilog.Sinks.Async": "1.5.0",
+            "Serilog.Sinks.File": "5.0.0",
+            "System.Text.Json": "8.0.5",
+            "WixToolset.Sdk": "4.0.5",
+            "WixToolset.UI.wixext": "4.0.5"
+          }
+        }
+      }
+    }
+  }
+}

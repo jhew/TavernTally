@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="WixToolset.Sdk/4.0.5">
+  <PropertyGroup>
+    <OutputType>Package</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <Platform>x64</Platform>
+    <OutputName>TavernTally</OutputName>
+    <ProductVersion>1.0.0</ProductVersion>
+    <PackageVersion>$(ProductVersion)</PackageVersion>
+    <!-- Set default values if not provided -->
+    <SourceDir Condition="'$(SourceDir)' == ''">.\</SourceDir>
+    <Version Condition="'$(Version)' == ''">$(ProductVersion)</Version>
+    <!-- Define WiX preprocessor variables -->
+    <DefineConstants>SourceDir=$(SourceDir);Version=$(Version);$(DefineConstants)</DefineConstants>
+  </PropertyGroup>
+  
+  <ItemGroup>
+    <PackageReference Include="WixToolset.UI.wixext" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <Compile Include="Product.wxs" />
+  </ItemGroup>
+</Project>

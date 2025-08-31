@@ -1,0 +1,1 @@
+C:\Users\jehew\TavernTally\installer\obj\x64\Release\installer.wixproj.CoreCompileInputs.cache

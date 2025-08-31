@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using Serilog;
 
 namespace TavernTally.App
 {
@@ -32,11 +33,6 @@ namespace TavernTally.App
                 _tray?.Dispose();
                 _tracker.Dispose();
             };
-            
-            // Initialize the window but don't show it yet
-            // The UpdateOverlayVisibility method will control actual visibility
-            WindowState = WindowState.Normal;
-            ShowInTaskbar = false;
         }
 
         private void OnLoaded(object? sender, RoutedEventArgs e)
@@ -52,61 +48,65 @@ namespace TavernTally.App
             {
                 // Track Hearthstone client rect and pin overlay to it
                 _tracker.OnClientRectChanged += r =>
+            {
+                Dispatcher.Invoke(() =>
                 {
-                    Dispatcher.Invoke(() =>
-                    {
-                        Left   = r.X + _settings.OffsetX;
-                        Top    = r.Y + _settings.OffsetY;
-                        Width  = r.Width;
-                        Height = r.Height;
-                        RenderHud();
-                    });
-                };
-                _tracker.Start();
+                    Left   = r.X + _settings.OffsetX;
+                    Top    = r.Y + _settings.OffsetY;
+                    Width  = r.Width;
+                    Height = r.Height;
+                    RenderHud();
+                });
+            };
+            _tracker.Start();
 
-                // Hotkeys
-                _hotkeys = new HotkeyManager(this);
-                _hotkeys.ToggleOverlay += () => { _settings.ShowOverlay = !_settings.ShowOverlay; _settings.Save(); };
-                _hotkeys.IncreaseScale += () => { _settings.UiScale = Math.Min(2.0, _settings.UiScale + 0.05); _settings.Save(); };
-                _hotkeys.DecreaseScale += () => { _settings.UiScale = Math.Max(0.5, _settings.UiScale - 0.05); _settings.Save(); };
-                _hotkeys.Register();
+            // Hotkeys
+            _hotkeys = new HotkeyManager(this);
+            _hotkeys.ToggleOverlay += () => { _settings.ShowOverlay = !_settings.ShowOverlay; _settings.Save(); };
+            _hotkeys.IncreaseScale += () => { _settings.UiScale = Math.Min(2.0, _settings.UiScale + 0.05); _settings.Save(); };
+            _hotkeys.DecreaseScale += () => { _settings.UiScale = Math.Max(0.5, _settings.UiScale - 0.05); _settings.Save(); };
+            _hotkeys.Register();
 
-                // Tray - with error handling
-                try
+            // Tray
+            _tray = new TrayIcon(_settings.ShowOverlay);
+            _tray.OverlayToggleRequested += (_, enabled) => { _settings.ShowOverlay = enabled; _settings.Save(); };
+            _tray.CalibrateRequested += (_, __) => ShowCalibrationWindow();
+            _tray.SettingsRequested += (_, __) => { /* Show settings dialog */ };
+            _tray.OpenRequested += (_, __) =>
+            {
+                // Handle open request - maybe show main window or settings
+            };
+            _tray.ExitRequested += (_, __) => System.Windows.Application.Current.Shutdown();
+
+            // Log tail + parser with robust log file discovery
+            var powerLogPath = HearthstoneLogFinder.FindPowerLog();
+            if (powerLogPath != null)
+            {
+                if (HearthstoneLogFinder.IsLoggingActive(powerLogPath))
                 {
-                    _tray = new TrayIcon(_settings.ShowOverlay);
-                    _tray.OverlayToggleRequested += (_, enabled) => { 
-                        _settings.ShowOverlay = enabled; 
-                        _settings.Save(); 
-                        UpdateOverlayVisibility();
-                    };
-                    _tray.SettingsRequested += (_, __) => { /* Show settings dialog */ };
-                    _tray.OpenRequested += (_, __) =>
-                    {
-                        // Handle open request - maybe show main window or settings
-                    };
-                    _tray.ExitRequested += (_, __) => System.Windows.Application.Current.Shutdown();
+                    _tail.OnLine += (line) => LogParser.Apply(line, _state);
+                    _tail.Start(powerLogPath);
+                    Log.Information("Hearthstone logging is active and working");
                 }
-                catch (Exception ex)
+                else
                 {
-                    System.Windows.MessageBox.Show($"Failed to create tray icon: {ex.Message}", "TavernTally Error", 
-                        System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+                    // Log file exists but appears inactive - try auto-configuration silently
+                    Log.Information("Hearthstone log file found but appears inactive, attempting auto-configuration...");
+                    TryAutoConfigureLogging();
                 }
+            }
+            else
+            {
+                // No log file found - try auto-configuration silently
+                Log.Information("No Hearthstone log file found, attempting auto-configuration...");
+                TryAutoConfigureLogging();
+            }
 
-                // Log tail + parser (safe)
-                string powerLog = System.IO.Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "Blizzard", "Hearthstone", "Logs", "Power.log");
-                _tail.OnLine += (line) => LogParser.Apply(line, _state);
-                _tail.Start(powerLog);
+            // Foreground check
+            _fg.OnChange += _ => Dispatcher.Invoke(RenderHud);
+            _fg.Start();
 
-                // Foreground check
-                _fg.OnChange += _ => Dispatcher.Invoke(RenderHud);
-                _fg.Start();
-
-                // Set initial overlay visibility
-                UpdateOverlayVisibility();
-                RenderHud();
+            RenderHud();
             }
             catch (Exception ex)
             {
@@ -115,15 +115,40 @@ namespace TavernTally.App
             }
         }
 
-        private void UpdateOverlayVisibility()
+        private void ShowCalibrationWindow()
         {
-            if (_settings.ShowOverlay)
+            try
             {
-                Show();
+                Log.Information("Opening overlay calibration window");
+                
+                var calibrationWindow = new CalibrationWindow(_settings, this);
+                calibrationWindow.SettingsChanged += (_, newSettings) =>
+                {
+                    // Update overlay in real-time as settings change
+                    Dispatcher.Invoke(RenderHud);
+                };
+                
+                // Show as modal dialog
+                var result = calibrationWindow.ShowDialog();
+                
+                if (result == true)
+                {
+                    // Settings were saved, update overlay
+                    RenderHud();
+                    Log.Information("Overlay calibration completed and saved");
+                }
+                else
+                {
+                    // Settings were cancelled, make sure overlay reflects current saved settings
+                    RenderHud();
+                    Log.Information("Overlay calibration cancelled");
+                }
             }
-            else
+            catch (Exception ex)
             {
-                Hide();
+                Log.Error(ex, "Error showing calibration window");
+                System.Windows.MessageBox.Show($"Failed to open calibration window: {ex.Message}", 
+                    "Calibration Error", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
             }
         }
 
@@ -179,7 +204,8 @@ namespace TavernTally.App
             if (HudCanvas == null) return;
             HudCanvas.Children.Clear();
 
-            if (!_settings.ShowOverlay || !_fg.HearthstoneIsForeground || !_state.InBattlegrounds)
+            // Only show overlay when: settings enabled, Hearthstone in foreground, in Battlegrounds, AND in recruit/shop phase
+            if (!_settings.ShowOverlay || !_fg.HearthstoneIsForeground || !_state.InBattlegrounds || !_state.InRecruitPhase)
                 return;
 
             // Shop numbers
@@ -222,6 +248,91 @@ namespace TavernTally.App
             var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
             int exStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
             SetWindowLong(hwnd, GWL_EXSTYLE, exStyle | WS_EX_TRANSPARENT | WS_EX_LAYERED);
+        }
+
+        // ---------- Logging Setup ----------
+        private void TryAutoConfigureLogging()
+        {
+            try
+            {
+                Log.Information("Attempting automatic Hearthstone logging configuration...");
+                
+                bool success = HearthstoneLogFinder.TryCreateLogConfig();
+                
+                if (success)
+                {
+                    Log.Information("✅ Successfully auto-configured Hearthstone logging");
+                    
+                    // Only show a notification if this is the first time setup
+                    // Check if this is a first-time user by looking for any existing config
+                    var powerLogPath = HearthstoneLogFinder.FindPowerLog();
+                    if (powerLogPath == null)
+                    {
+                        // First time setup - show helpful notification
+                        System.Windows.MessageBox.Show(
+                            "✅ TavernTally has configured Hearthstone logging automatically!\n\n" +
+                            "Next steps:\n" +
+                            "• Restart Hearthstone (if it's running)\n" +
+                            "• Restart TavernTally\n\n" +
+                            "The overlay will then activate during Battlegrounds games.",
+                            "Setup Complete",
+                            System.Windows.MessageBoxButton.OK,
+                            System.Windows.MessageBoxImage.Information);
+                    }
+                }
+                else
+                {
+                    Log.Warning("Auto-configuration failed, user intervention may be required");
+                    
+                    // Only show dialog if auto-config fails and user needs to take action
+                    ShowLoggingSetupWindow(logFileExists: false, loggingActive: false);
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Error during automatic logging configuration");
+                
+                // Only show dialog if there's an actual error that needs user attention
+                ShowLoggingSetupWindow(logFileExists: false, loggingActive: false);
+            }
+        }
+
+        private void ShowLoggingSetupWindow(bool logFileExists, bool loggingActive)
+        {
+            try
+            {
+                // This method is now only called when auto-configuration has failed
+                // and user intervention is actually needed
+                
+                string message = "⚠️ TavernTally could not automatically configure Hearthstone logging.\n\n" +
+                               "This might happen if:\n" +
+                               "• Hearthstone is installed in a custom location\n" +
+                               "• You don't have write permissions\n" +
+                               "• Hearthstone is currently running\n\n" +
+                               "Would you like to see manual setup instructions?";
+
+                var result = System.Windows.MessageBox.Show(
+                    message,
+                    "TavernTally - Manual Setup Required",
+                    System.Windows.MessageBoxButton.YesNo,
+                    System.Windows.MessageBoxImage.Warning);
+
+                if (result == System.Windows.MessageBoxResult.Yes)
+                {
+                    // Show manual instructions
+                    System.Windows.MessageBox.Show(
+                        HearthstoneLogFinder.GetLoggingInstructions(),
+                        "Manual Setup Instructions",
+                        System.Windows.MessageBoxButton.OK,
+                        System.Windows.MessageBoxImage.Information);
+                }
+                
+                // If user clicks No, just continue - they can access setup later via tray menu if needed
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Error showing logging setup window");
+            }
         }
 
         private const int GWL_EXSTYLE = -20;
