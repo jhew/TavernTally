@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("TavernTally.App")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+4cdb973f068db43b5dfef9f5495bdbdb9de352a1")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+72b1f9ba8efa21e4893fd947a6dabdce5cbf9d65")]
 [assembly: System.Reflection.AssemblyProductAttribute("TavernTally.App")]
 [assembly: System.Reflection.AssemblyTitleAttribute("TavernTally.App")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

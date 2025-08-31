@@ -15,8 +15,10 @@ C:\Users\jehew\TavernTally\src\TavernTally.App\bin\Debug\net8.0-windows\Serilog.
 C:\Users\jehew\TavernTally\src\TavernTally.App\bin\Debug\net8.0-windows\Serilog.Sinks.Async.dll
 C:\Users\jehew\TavernTally\src\TavernTally.App\bin\Debug\net8.0-windows\Serilog.Sinks.File.dll
 C:\Users\jehew\TavernTally\src\TavernTally.App\obj\Debug\net8.0-windows\TavernTally.App.csproj.AssemblyReference.cache
+C:\Users\jehew\TavernTally\src\TavernTally.App\obj\Debug\net8.0-windows\CalibrationWindow.baml
 C:\Users\jehew\TavernTally\src\TavernTally.App\obj\Debug\net8.0-windows\OverlayWindow.baml
 C:\Users\jehew\TavernTally\src\TavernTally.App\obj\Debug\net8.0-windows\App.baml
+C:\Users\jehew\TavernTally\src\TavernTally.App\obj\Debug\net8.0-windows\CalibrationWindow.g.cs
 C:\Users\jehew\TavernTally\src\TavernTally.App\obj\Debug\net8.0-windows\OverlayWindow.g.cs
 C:\Users\jehew\TavernTally\src\TavernTally.App\obj\Debug\net8.0-windows\App.g.cs
 C:\Users\jehew\TavernTally\src\TavernTally.App\obj\Debug\net8.0-windows\TavernTally.App_Content.g.cs
@@ -33,7 +35,3 @@ C:\Users\jehew\TavernTally\src\TavernTally.App\obj\Debug\net8.0-windows\refint\T
 C:\Users\jehew\TavernTally\src\TavernTally.App\obj\Debug\net8.0-windows\TavernTally.App.pdb
 C:\Users\jehew\TavernTally\src\TavernTally.App\obj\Debug\net8.0-windows\TavernTally.App.genruntimeconfig.cache
 C:\Users\jehew\TavernTally\src\TavernTally.App\obj\Debug\net8.0-windows\ref\TavernTally.App.dll
-C:\Users\jehew\TavernTally\src\TavernTally.App\obj\Debug\net8.0-windows\CalibrationWindow.baml
-C:\Users\jehew\TavernTally\src\TavernTally.App\obj\Debug\net8.0-windows\CalibrationWindow.g.cs
-C:\Users\jehew\TavernTally\src\TavernTally.App\obj\Debug\net8.0-windows\LoggingSetupWindow.baml
-C:\Users\jehew\TavernTally\src\TavernTally.App\obj\Debug\net8.0-windows\LoggingSetupWindow.g.cs
