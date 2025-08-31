@@ -1,35 +1,79 @@
-name: build
+name: Build and Release
 on:
-  push: { branches: [ main ] }
+  push: 
+    branches: [ main ]
+    tags: [ 'v*' ]
   pull_request: {}
+
 jobs:
   build:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      
       - uses: actions/setup-dotnet@v4
-        with: { dotnet-version: '8.0.x' }
+        with: 
+          dotnet-version: '8.0.x'
+      
       - name: Install WiX 4 CLI
-        run: dotnet tool install --global wix
-      - name: Restore
+        run: dotnet tool install --global wix --version 4.0.5
+      
+      - name: Restore dependencies
         run: dotnet restore
-      - name: Publish app
-        run: dotnet publish ./TavernTally.App/TavernTally.App.csproj -c Release -f net8.0-windows -o ./publish
-      - name: Build MSI
-        run: wix build ./installer/installer.wixproj -o ./artifacts/TavernTally.msi
-      - name: Sign (optional)
-        if: ${{ secrets.SIGNING_CERT && secrets.SIGNING_PWD }}
+      
+      - name: Build application
+        run: dotnet build --configuration Release --no-restore
+      
+      - name: Run tests (if any)
+        run: dotnet test --no-build --configuration Release --verbosity normal
+        continue-on-error: true
+      
+      - name: Publish self-contained application
         run: |
-          "$env:ProgramFiles(x86)\Windows Kits\10\bin\x64\signtool.exe" sign /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 `
-            /f $env:SIGNING_CERT /p $env:SIGNING_PWD ./publish/TavernTally.App.exe
-          "$env:ProgramFiles(x86)\Windows Kits\10\bin\x64\signtool.exe" sign /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 `
-            /f $env:SIGNING_CERT /p $env:SIGNING_PWD ./artifacts/TavernTally.msi
-        env:
-          SIGNING_CERT: ${{ secrets.SIGNING_CERT }}
-          SIGNING_PWD: ${{ secrets.SIGNING_PWD }}
-      - uses: actions/upload-artifact@v4
+          dotnet publish ./src/TavernTally.App/TavernTally.App.csproj `
+            -c Release `
+            -f net8.0-windows `
+            -o ./publish `
+            --self-contained true `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:PublishTrimmed=false
+      
+      - name: Create installer directory structure
+        run: |
+          New-Item -ItemType Directory -Force -Path "./installer-build"
+          Copy-Item "./publish/*" "./installer-build/" -Recurse -Force
+          Copy-Item "./assets/app.ico" "./installer-build/" -Force
+      
+      - name: Build MSI installer
+        run: |
+          wix build ./installer/installer.wixproj `
+            -ext WixToolset.UI.wixext `
+            -d SourceDir="./installer-build" `
+            -d Version="1.0.${{ github.run_number }}" `
+            -o "./artifacts/TavernTally-v1.0.${{ github.run_number }}.msi"
+      
+      - name: Create portable ZIP
+        run: |
+          Compress-Archive -Path "./publish/*" -DestinationPath "./artifacts/TavernTally-Portable-v1.0.${{ github.run_number }}.zip"
+      
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
         with:
-          name: drop
+          name: TavernTally-Release-v1.0.${{ github.run_number }}
           path: |
-            ./publish/TavernTally.App.exe
-            ./artifacts/TavernTally.msi
+            ./artifacts/*.msi
+            ./artifacts/*.zip
+          retention-days: 90
+      
+      # Create GitHub Release for tags
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            ./artifacts/*.msi
+            ./artifacts/*.zip
+          draft: false
+          prerelease: false
+          generate_release_notes: true
