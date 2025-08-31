@@ -1,0 +1,35 @@
+name: build
+on:
+  push: { branches: [ main ] }
+  pull_request: {}
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with: { dotnet-version: '8.0.x' }
+      - name: Install WiX 4 CLI
+        run: dotnet tool install --global wix
+      - name: Restore
+        run: dotnet restore
+      - name: Publish app
+        run: dotnet publish ./TavernTally.App/TavernTally.App.csproj -c Release -f net8.0-windows -o ./publish
+      - name: Build MSI
+        run: wix build ./installer/installer.wixproj -o ./artifacts/TavernTally.msi
+      - name: Sign (optional)
+        if: ${{ secrets.SIGNING_CERT && secrets.SIGNING_PWD }}
+        run: |
+          "$env:ProgramFiles(x86)\Windows Kits\10\bin\x64\signtool.exe" sign /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 `
+            /f $env:SIGNING_CERT /p $env:SIGNING_PWD ./publish/TavernTally.App.exe
+          "$env:ProgramFiles(x86)\Windows Kits\10\bin\x64\signtool.exe" sign /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 `
+            /f $env:SIGNING_CERT /p $env:SIGNING_PWD ./artifacts/TavernTally.msi
+        env:
+          SIGNING_CERT: ${{ secrets.SIGNING_CERT }}
+          SIGNING_PWD: ${{ secrets.SIGNING_PWD }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: drop
+          path: |
+            ./publish/TavernTally.App.exe
+            ./artifacts/TavernTally.msi

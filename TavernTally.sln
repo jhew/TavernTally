@@ -1,0 +1,36 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.2.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{827E0CD3-B72D-47B6-A68D-7590B98EB39B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TavernTally.App", "src/TavernTally.App/TavernTally.App.csproj", "{DA35FB01-22AF-4536-7FBD-34BB283EAECE}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Updater", "src/Updater/Updater.csproj", "{B42CD5D5-438B-36B6-633D-B6DD7258F391}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{DA35FB01-22AF-4536-7FBD-34BB283EAECE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DA35FB01-22AF-4536-7FBD-34BB283EAECE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DA35FB01-22AF-4536-7FBD-34BB283EAECE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DA35FB01-22AF-4536-7FBD-34BB283EAECE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B42CD5D5-438B-36B6-633D-B6DD7258F391}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B42CD5D5-438B-36B6-633D-B6DD7258F391}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B42CD5D5-438B-36B6-633D-B6DD7258F391}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B42CD5D5-438B-36B6-633D-B6DD7258F391}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{DA35FB01-22AF-4536-7FBD-34BB283EAECE} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+		{B42CD5D5-438B-36B6-633D-B6DD7258F391} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {6891474D-24E6-4F86-804B-6FB6D09600FD}
+	EndGlobalSection
+EndGlobal

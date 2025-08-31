@@ -1,0 +1,28 @@
+<Project>
+  <!-- Enable Central Package Management -->
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+
+  <!-- Central Package Management for the whole solution -->
+  <ItemGroup>
+    <!-- Core JSON (ships with .NET but we pin for reproducibility) -->
+    <PackageVersion Include="System.Text.Json" Version="8.0.5" />
+
+    <!-- Optional: Structured logging (enable if you wire Serilog in Program/App) -->
+    <PackageVersion Include="Serilog" Version="3.1.1" />
+    <PackageVersion Include="Serilog.Sinks.File" Version="5.0.0" />
+    <PackageVersion Include="Serilog.Sinks.Async" Version="1.5.0" />
+    <!-- Bridges Microsoft.Extensions.Logging -> Serilog (optional) -->
+    <PackageVersion Include="Serilog.Extensions.Logging" Version="8.0.0" />
+
+    <!-- Optional: Build MSI inside MSBuild (if you choose; otherwise you can keep using wix CLI) -->
+    <PackageVersion Include="WixToolset.Sdk" Version="4.0.5" />
+  </ItemGroup>
+
+  <!-- (Optional) lock transitive packages once you’re stable:
+  <PropertyGroup>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+  </PropertyGroup>
+  -->
+</Project>
