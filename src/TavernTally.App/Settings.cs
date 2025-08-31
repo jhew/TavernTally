@@ -7,6 +7,7 @@ namespace TavernTally.App
     public class Settings
     {
         public bool ShowOverlay { get; set; } = true;
+        public bool DebugAlwaysShowOverlay { get; set; } = true; // temporarily force-draw overlay to align
         public double UiScale { get; set; } = 1.0;
 
         // Global pixel nudges (applied after % anchoring and window tracking)
@@ -51,6 +52,12 @@ namespace TavernTally.App
         {
             Directory.CreateDirectory(Dir);
             File.WriteAllText(PathFile, JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true }));
+        }
+
+        public static void Save(Settings settings)
+        {
+            Directory.CreateDirectory(Dir);
+            File.WriteAllText(PathFile, JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true }));
         }
     }
 }

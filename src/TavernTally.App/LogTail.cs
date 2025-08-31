@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 
 namespace TavernTally.App
 {
@@ -14,26 +16,89 @@ namespace TavernTally.App
 
         public void Start(string file)
         {
-            if (!File.Exists(file)) return;
-            _stream = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-            _reader = new StreamReader(_stream);
-            _pos = _stream.Length; // start tailing new content only
-            _stream.Position = _pos;
+            if (string.IsNullOrEmpty(file) || !File.Exists(file)) 
+            {
+                return;
+            }
+            
+            try
+            {
+                _stream = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                _reader = new StreamReader(_stream);
+                
+                // Process existing content from the end of the file (last 100 lines for context)
+                ProcessRecentLines();
+                
+                _pos = _stream.Length; // start tailing new content from here
+                _stream.Position = _pos;
 
-            var dir = Path.GetDirectoryName(file)!;
-            var name = Path.GetFileName(file);
-            _fsw = new FileSystemWatcher(dir, name) { NotifyFilter = NotifyFilters.Size | NotifyFilters.LastWrite, EnableRaisingEvents = true };
-            _fsw.Changed += (_, __) => Pump();
+                var dir = Path.GetDirectoryName(file)!;
+                var name = Path.GetFileName(file);
+                _fsw = new FileSystemWatcher(dir, name) 
+                { 
+                    NotifyFilter = NotifyFilters.Size | NotifyFilters.LastWrite, 
+                    EnableRaisingEvents = true 
+                };
+                _fsw.Changed += (_, __) => Pump();
+            }
+            catch (Exception ex)
+            {
+                // Log the error but don't crash the application
+                System.Diagnostics.Debug.WriteLine($"LogTail.Start failed for {file}: {ex.Message}");
+                Dispose(); // Clean up any partially initialized resources
+            }
+        }
+
+        private void ProcessRecentLines()
+        {
+            if (_stream == null || _reader == null) return;
+            
+            try
+            {
+                // Read the last portion of the file to catch up on recent game state
+                var fileLength = _stream.Length;
+                const int maxReadSize = 50000; // Read up to 50KB from the end
+                var startPos = Math.Max(0, fileLength - maxReadSize);
+                
+                _stream.Position = startPos;
+                var lines = new List<string>();
+                
+                string? line;
+                while ((line = _reader.ReadLine()) != null)
+                {
+                    lines.Add(line);
+                }
+                
+                // Process the last 100 lines (or all if fewer)
+                var recentLines = lines.TakeLast(100);
+                foreach (var recentLine in recentLines)
+                {
+                    OnLine?.Invoke(recentLine);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"LogTail.ProcessRecentLines error: {ex.Message}");
+            }
         }
 
         private void Pump()
         {
             if (_reader == null || _stream == null) return;
-            _stream.Position = _pos;
-            string? line;
-            while ((line = _reader.ReadLine()) != null)
-                OnLine?.Invoke(line);
-            _pos = _stream.Position;
+            
+            try
+            {
+                _stream.Position = _pos;
+                string? line;
+                while ((line = _reader.ReadLine()) != null)
+                    OnLine?.Invoke(line);
+                _pos = _stream.Position;
+            }
+            catch (Exception ex)
+            {
+                // Log the error but continue operation
+                System.Diagnostics.Debug.WriteLine($"LogTail.Pump error: {ex.Message}");
+            }
         }
 
         public void Dispose()

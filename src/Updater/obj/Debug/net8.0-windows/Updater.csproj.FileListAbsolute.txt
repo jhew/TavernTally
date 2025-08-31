@@ -7,6 +7,7 @@ C:\Users\jehew\TavernTally\src\Updater\obj\Debug\net8.0-windows\Updater.Generate
 C:\Users\jehew\TavernTally\src\Updater\obj\Debug\net8.0-windows\Updater.AssemblyInfoInputs.cache
 C:\Users\jehew\TavernTally\src\Updater\obj\Debug\net8.0-windows\Updater.AssemblyInfo.cs
 C:\Users\jehew\TavernTally\src\Updater\obj\Debug\net8.0-windows\Updater.csproj.CoreCompileInputs.cache
+C:\Users\jehew\TavernTally\src\Updater\obj\Debug\net8.0-windows\Updater.sourcelink.json
 C:\Users\jehew\TavernTally\src\Updater\obj\Debug\net8.0-windows\Updater.dll
 C:\Users\jehew\TavernTally\src\Updater\obj\Debug\net8.0-windows\refint\Updater.dll
 C:\Users\jehew\TavernTally\src\Updater\obj\Debug\net8.0-windows\Updater.pdb
