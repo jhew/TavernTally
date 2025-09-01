@@ -8,9 +8,12 @@ namespace TavernTally.App
     {
         // ========== GAME MODE DETECTION ==========
         
-        // Battlegrounds mode detection - enhanced patterns
-        static readonly Regex ReBgEnter = new(@"(GAME_TYPE_BATTLEGROUNDS|GameType=GT_BATTLEGROUNDS|LoadingScreen\.PlayModeChanged.*BACON)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-        static readonly Regex ReBgModeStart = new(@"(Bacon|BattlegroundsGameplayUI)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        // Battlegrounds mode detection - enhanced patterns for real Hearthstone logs
+        static readonly Regex ReBgEnter = new(@"(GAME_TYPE_BATTLEGROUNDS|GameType=GT_BATTLEGROUNDS|LoadingScreen\.PlayModeChanged.*BACON|Gameplay=GT_BATTLEGROUNDS)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        static readonly Regex ReBgModeStart = new(@"(Bacon|BattlegroundsGameplayUI|BATTLEGROUNDS)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        
+        // More aggressive Battlegrounds detection - look for any Battlegrounds-related content
+        static readonly Regex ReBgGeneric = new(@"(battlegrounds|bacon|tavern.*tier|bob.*tavern)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
         
         // Game state transitions
         static readonly Regex ReGameStart = new(@"TAG_CHANGE.*tag=STATE value=RUNNING", RegexOptions.Compiled);
@@ -73,6 +76,9 @@ namespace TavernTally.App
                 // ===== GAME MODE DETECTION =====
                 CheckGameModeTransitions(line, s);
                 
+                // ===== PHASE DETECTION =====
+                CheckPhaseTransitions(line, s);
+                
                 // ===== BATTLEGROUNDS TRANSACTION DETECTION =====
                 // Check for shop transactions even if not yet detected as in Battlegrounds
                 // This helps catch transitions and provides more responsive detection
@@ -94,14 +100,41 @@ namespace TavernTally.App
                 if (line.Contains("ZONE_CHANGE") || line.Contains("TAG_CHANGE") || line.Contains("BACON"))
                 {
                     Log.Information("Parsed line: {Line}", line);
-                    Log.Debug("Current state: Shop={Shop}, Hand={Hand}, Board={Board}, Tier={Tier}, InBG={InBG}", 
-                        s.ShopCount, s.HandCount, s.BoardCount, s.TavernTier, s.InBattlegrounds);
+                    Log.Debug("Current state: Shop={Shop}, Hand={Hand}, Board={Board}, Tier={Tier}, InBG={InBG}, InRecruit={InRecruit}", 
+                        s.ShopCount, s.HandCount, s.BoardCount, s.TavernTier, s.InBattlegrounds, s.InRecruitPhase);
                 }
                 
             }
             catch (System.Exception ex)
             {
                 Log.Warning(ex, "Error parsing log line: {Line}", line);
+            }
+        }
+        
+        private static void CheckPhaseTransitions(string line, BgState s)
+        {
+            // Detect recruit phase (shopping time)
+            if (line.Contains("RECRUITING", StringComparison.OrdinalIgnoreCase) ||
+                line.Contains("TAVERN", StringComparison.OrdinalIgnoreCase) ||
+                line.Contains("SHOP", StringComparison.OrdinalIgnoreCase) ||
+                line.Contains("BUY", StringComparison.OrdinalIgnoreCase) ||
+                line.Contains("SELL", StringComparison.OrdinalIgnoreCase))
+            {
+                s.SetRecruitPhase(true);
+            }
+            
+            // Detect combat phase
+            if (line.Contains("COMBAT", StringComparison.OrdinalIgnoreCase) ||
+                line.Contains("BATTLE", StringComparison.OrdinalIgnoreCase) ||
+                line.Contains("ATTACKING", StringComparison.OrdinalIgnoreCase))
+            {
+                s.SetCombatPhase(true);
+            }
+            
+            // For now, if we're in Battlegrounds but don't know the phase, assume recruit
+            if (s.InBattlegrounds && !s.InRecruitPhase && !s.InCombat)
+            {
+                s.SetRecruitPhase(true);
             }
         }
         
@@ -121,14 +154,36 @@ namespace TavernTally.App
         
         private static void CheckGameModeTransitions(string line, BgState s)
         {
-            // Detect entering Battlegrounds
+            // Multiple detection methods for Battlegrounds
+            bool foundBattlegrounds = false;
+            
+            // Method 1: Explicit game type detection
             if (ReBgEnter.IsMatch(line) || ReBgModeStart.IsMatch(line))
             {
-                if (!s.InBattlegrounds)
-                {
-                    Log.Debug("Detected Battlegrounds mode entry");
-                    s.SetMode(true);
-                }
+                foundBattlegrounds = true;
+                Log.Information("Battlegrounds detected via explicit pattern: {Line}", line);
+            }
+            
+            // Method 2: Generic Battlegrounds content detection
+            if (!foundBattlegrounds && ReBgGeneric.IsMatch(line))
+            {
+                foundBattlegrounds = true;
+                Log.Information("Battlegrounds detected via generic pattern: {Line}", line);
+            }
+            
+            // Method 3: Look for specific Battlegrounds UI elements or cards
+            if (!foundBattlegrounds && (line.Contains("BattlegroundsGameplayUI", StringComparison.OrdinalIgnoreCase) ||
+                                       line.Contains("BACON", StringComparison.OrdinalIgnoreCase) ||
+                                       line.Contains("Tavern", StringComparison.OrdinalIgnoreCase)))
+            {
+                foundBattlegrounds = true;
+                Log.Information("Battlegrounds detected via keyword search: {Line}", line);
+            }
+            
+            if (foundBattlegrounds && !s.InBattlegrounds)
+            {
+                Log.Information("Enabling Battlegrounds mode");
+                s.SetMode(true);
             }
             
             // Detect game ending
@@ -136,7 +191,7 @@ namespace TavernTally.App
             {
                 if (s.InBattlegrounds)
                 {
-                    Log.Debug("Detected game end - exiting Battlegrounds mode");
+                    Log.Information("Game ended - exiting Battlegrounds mode");
                     s.SetMode(false);
                 }
             }
@@ -144,7 +199,7 @@ namespace TavernTally.App
             // Detect new game starting (reset state)
             if (ReGameReset.IsMatch(line))
             {
-                Log.Debug("Detected new game creation - resetting state");
+                Log.Information("New game detected - resetting state");
                 s.Reset();
             }
         }

@@ -20,7 +20,7 @@ namespace TavernTally.App
             set => _showOverlay = value; 
         }
 
-        public bool DebugAlwaysShowOverlay { get; set; } = true; // temporarily force-draw overlay to align
+        public bool DebugAlwaysShowOverlay { get; set; } = false; // only show overlay when appropriate conditions are met
         
         // Manual Battlegrounds mode toggle - for when log detection fails
         public bool ManualBattlegroundsMode { get; set; } = false;
