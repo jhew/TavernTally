@@ -19,6 +19,8 @@ namespace TavernTally.App
         private TrayIcon? _tray;
         private readonly WindowTracker _tracker = new();
         private bool _isInitialized = false;  // Prevent double initialization
+        private double _lastDetectedWidth = 0;
+        private double _lastDetectedHeight = 0;
 
         public OverlayWindow()
         {
@@ -51,10 +53,32 @@ namespace TavernTally.App
             {
                 Dispatcher.Invoke(() =>
                 {
-                    Left   = r.X + _settings.OffsetX;
-                    Top    = r.Y + _settings.OffsetY;
-                    Width  = r.Width;
-                    Height = r.Height;
+                    _lastDetectedWidth = r.Width;
+                    _lastDetectedHeight = r.Height;
+                    
+                    Log.Information($"[WINDOW DETECTION] Hearthstone window: X={r.X}, Y={r.Y}, Width={r.Width}, Height={r.Height}");
+                    
+                    // DEBUGGING: Force overlay to be visible on primary screen if Hearthstone detection fails
+                    if (r.Width <= 0 || r.Height <= 0 || r.X < -10000 || r.Y < -10000)
+                    {
+                        // Hearthstone not detected properly - position overlay on main screen center
+                        Left = 100;
+                        Top = 100; 
+                        Width = 800;
+                        Height = 600;
+                        Log.Warning("Hearthstone window not detected properly, forcing overlay to visible position");
+                    }
+                    else
+                    {
+                        // Position overlay to match Hearthstone's position and use full detected size
+                        Left = r.X + _settings.OffsetX;
+                        Top = r.Y + _settings.OffsetY;
+                        Width = r.Width;
+                        Height = r.Height;
+                        
+                        Log.Information($"[OVERLAY POSITIONED] Using full detected dimensions: Left={Left}, Top={Top}, Width={Width}, Height={Height}");
+                    }
+                    
                     RenderHud();
                 });
             };
@@ -65,6 +89,36 @@ namespace TavernTally.App
             _hotkeys.ToggleOverlay += () => { _settings.ShowOverlay = !_settings.ShowOverlay; _settings.Save(); };
             _hotkeys.IncreaseScale += () => { _settings.UiScale = Math.Min(2.0, _settings.UiScale + 0.05); _settings.Save(); };
             _hotkeys.DecreaseScale += () => { _settings.UiScale = Math.Max(0.5, _settings.UiScale - 0.05); _settings.Save(); };
+            _hotkeys.ToggleManualBattlegrounds += () => { 
+                _settings.ManualBattlegroundsMode = !_settings.ManualBattlegroundsMode; 
+                _settings.Save(); 
+                Log.Information("Manual Battlegrounds mode: {Mode}", _settings.ManualBattlegroundsMode ? "ENABLED" : "DISABLED");
+                
+                // When enabling manual mode, also enable manual counts and set reasonable defaults
+                if (_settings.ManualBattlegroundsMode)
+                {
+                    _state.UseManualCounts = true;
+                    _state.SetMode(true); // Force Battlegrounds mode
+                    if (_state.ManualShopCount == 0)
+                    {
+                        _state.ManualShopCount = 3; // Default to tier 1 (3 shop slots)
+                    }
+                }
+                
+                RenderHud(); // Update the overlay to show the changes
+            };
+            _hotkeys.IncreaseShopCount += () => {
+                _state.UseManualCounts = true;
+                _state.ManualShopCount = Math.Min(7, _state.ManualShopCount + 1);
+                Log.Information("Manual shop count: {Count}", _state.ManualShopCount);
+                RenderHud();
+            };
+            _hotkeys.DecreaseShopCount += () => {
+                _state.UseManualCounts = true;
+                _state.ManualShopCount = Math.Max(0, _state.ManualShopCount - 1);
+                Log.Information("Manual shop count: {Count}", _state.ManualShopCount);
+                RenderHud();
+            };
             _hotkeys.Register();
 
             // Tray
@@ -84,7 +138,35 @@ namespace TavernTally.App
             {
                 if (HearthstoneLogFinder.IsLoggingActive(powerLogPath))
                 {
-                    _tail.OnLine += (line) => LogParser.Apply(line, _state);
+                    _tail.OnLine += (line) => 
+                    {
+                        var previousShop = _state.ShopCount;
+                        var previousHand = _state.HandCount;
+                        var previousBoard = _state.BoardCount;
+                        
+                        // Debug: Log every line being processed to console for troubleshooting
+                        Console.WriteLine($"[LOGPARSE] {line}");
+                        Log.Information("Processing log line: {Line}", line);
+                        
+                        LogParser.Apply(line, _state);
+                        
+                        // Trigger overlay update if any counts changed
+                        if (_state.ShopCount != previousShop || 
+                            _state.HandCount != previousHand || 
+                            _state.BoardCount != previousBoard)
+                        {
+                            Dispatcher.Invoke(() => {
+                                Log.Information("State changed - updating overlay: Shop={Shop}, Hand={Hand}, Board={Board}", 
+                                    _state.ShopCount, _state.HandCount, _state.BoardCount);
+                                Console.WriteLine($"[STATE_CHANGE] Shop={_state.ShopCount}, Hand={_state.HandCount}, Board={_state.BoardCount}");
+                                RenderHud();
+                            });
+                        }
+                        else
+                        {
+                            Console.WriteLine($"[NO_CHANGE] Shop={_state.ShopCount}, Hand={_state.HandCount}, Board={_state.BoardCount}");
+                        }
+                    };
                     _tail.Start(powerLogPath);
                     Log.Information("Hearthstone logging is active and working");
                 }
@@ -152,48 +234,188 @@ namespace TavernTally.App
             }
         }
 
-        // ---------- Percent-based anchors ----------
+        // ---------- Responsive positioning system ----------
+        // Universal positioning system that adapts to different screen sizes, resolutions, and aspect ratios
+        // Supports: 4K, 1080p, 1440p, ultrawide (21:9), standard wide (16:9, 16:10), and legacy (4:3, 5:4)
+        // Uses user settings as base values and applies intelligent adjustments based on detected screen characteristics
         private System.Windows.Point Px(double xpct, double ypct) => new(Width * xpct, Height * ypct);
 
-        private static readonly double[] ShopXPcts7 = { 0.32, 0.40, 0.48, 0.56, 0.64, 0.72, 0.80 };
-        private static readonly double[] BoardXPcts = { 0.18, 0.28, 0.38, 0.48, 0.58, 0.68, 0.78 };
+        /// <summary>
+        /// Gets responsive positioning values based on detected screen resolution and aspect ratio
+        /// Uses settings values as base and applies responsive adjustments
+        /// </summary>
+        private (double shopY, double boardY, double handY) GetResponsiveYPositions()
+        {
+            double aspectRatio = Width / Height;
+            double baseWidth = _lastDetectedWidth > 0 ? _lastDetectedWidth : Width;
+            double baseHeight = _lastDetectedHeight > 0 ? _lastDetectedHeight : Height;
+            
+            // Start with user's configured base values
+            double shopY = _settings.ShopYPct;
+            double boardY = _settings.BoardYPct; 
+            double handY = _settings.HandYPct;
+            
+            // Detect common resolutions and adjust accordingly
+            bool is4K = baseWidth >= 3840 || baseHeight >= 2160;
+            bool isUltrawide = aspectRatio > 1.9; // 21:9 or wider
+            bool isStandardWide = aspectRatio >= 1.6 && aspectRatio <= 1.9; // 16:9, 16:10
+            bool isOldRatio = aspectRatio < 1.6; // 4:3, 5:4
+            
+            Log.Debug($"[RESPONSIVE] Resolution: {baseWidth}x{baseHeight}, Aspect: {aspectRatio:F2}, 4K: {is4K}, Ultrawide: {isUltrawide}");
+            
+            // Apply responsive adjustments to base values
+            if (is4K)
+            {
+                // 4K adjustments - UI elements are relatively smaller, slight shifts needed
+                shopY += 0.00; // Keep user setting for 4K
+                boardY -= 0.02; // Slight adjustment for 4K
+                handY -= 0.02; // Slight adjustment for 4K
+            }
+            else if (isUltrawide)
+            {
+                // Ultrawide monitors - cards may be positioned differently due to UI scaling
+                shopY += 0.03;
+                boardY += 0.02;
+                handY += 0.02;
+            }
+            else if (isOldRatio)
+            {
+                // 4:3 or 5:4 monitors - older aspect ratios have different UI proportions
+                shopY += 0.06;
+                boardY += 0.05;
+                handY += 0.04;
+            }
+            
+            // Fine-tune based on actual height
+            if (baseHeight < 720)
+            {
+                // Very low resolution adjustments
+                shopY += 0.02;
+                boardY += 0.02;
+                handY -= 0.02;
+            }
+            else if (baseHeight > 1440 && !is4K)
+            {
+                // High resolution (but not 4K) adjustments
+                shopY -= 0.01;
+                boardY -= 0.01;
+                handY -= 0.01;
+            }
+            
+            // Ensure values stay within reasonable bounds
+            shopY = Math.Clamp(shopY, 0.05, 0.40);
+            boardY = Math.Clamp(boardY, 0.30, 0.70);
+            handY = Math.Clamp(handY, 0.75, 0.95);
+            
+            return (shopY, boardY, handY);
+        }
+
+        /// <summary>
+        /// Gets responsive X positions for shop cards based on screen width and aspect ratio
+        /// </summary>
+        private double[] GetResponsiveShopXPositions(int cardCount)
+        {
+            if (cardCount <= 0) return Array.Empty<double>();
+            
+            double aspectRatio = Width / Height;
+            double baseWidth = _lastDetectedWidth > 0 ? _lastDetectedWidth : Width;
+            
+            // Base positions for standard layouts
+            double[] basePositions = { 0.17, 0.27, 0.37, 0.47, 0.57, 0.67, 0.77 };
+            
+            // Adjust for ultrawide monitors
+            if (aspectRatio > 1.9)
+            {
+                // Ultrawide - cards are more centered horizontally
+                double centerOffset = (aspectRatio - 1.78) * 0.05; // Adjust center based on how wide
+                basePositions = basePositions.Select(x => x + centerOffset * (x - 0.5)).ToArray();
+            }
+            
+            // Adjust for very wide or narrow screens
+            if (baseWidth > 3440) // Very wide screens
+            {
+                // Spread cards slightly more
+                basePositions = basePositions.Select(x => 0.5 + (x - 0.5) * 1.02).ToArray();
+            }
+            else if (baseWidth < 1366) // Smaller screens
+            {
+                // Compress cards slightly
+                basePositions = basePositions.Select(x => 0.5 + (x - 0.5) * 0.98).ToArray();
+            }
+            
+            return basePositions.Take(cardCount).ToArray();
+        }
+
+        /// <summary>
+        /// Gets responsive X positions for board cards
+        /// </summary>
+        private double[] GetResponsiveBoardXPositions(int cardCount)
+        {
+            if (cardCount <= 0) return Array.Empty<double>();
+            
+            // Board positions are similar to shop but may have slight differences
+            var shopPositions = GetResponsiveShopXPositions(cardCount);
+            
+            // Board cards are often slightly more spread out
+            return shopPositions.Select(x => 0.5 + (x - 0.5) * 1.01).ToArray();
+        }
 
         private System.Windows.Point[] ShopAnchors(int n)
         {
             n = Math.Clamp(n, 0, 7);
             if (n <= 0) return Array.Empty<System.Windows.Point>();
-            if (n == 1) return new[] { Px(0.56, _settings.ShopYPct) };
-
-            return Enumerable.Range(0, n)
-                .Select(i =>
-                {
-                    double t = i / (double)(n - 1);
-                    int idx = (int)Math.Round(t * (ShopXPcts7.Length - 1));
-                    return Px(ShopXPcts7[idx], _settings.ShopYPct);
-                })
-                .ToArray();
+            
+            var (shopY, _, _) = GetResponsiveYPositions();
+            var xPositions = GetResponsiveShopXPositions(n);
+            
+            if (n == 1) return new[] { Px(0.50, shopY) };
+            
+            return xPositions.Select(x => Px(x, shopY)).ToArray();
         }
 
         private System.Windows.Point[] BoardAnchors(int n)
         {
             n = Math.Clamp(n, 0, 7);
-            return Enumerable.Range(0, n)
-                .Select(i => Px(BoardXPcts[i], _settings.BoardYPct))
-                .ToArray();
+            if (n <= 0) return Array.Empty<System.Windows.Point>();
+            
+            var (_, boardY, _) = GetResponsiveYPositions();
+            var xPositions = GetResponsiveBoardXPositions(n);
+            
+            return xPositions.Select(x => Px(x, boardY)).ToArray();
         }
 
         private System.Windows.Point[] HandAnchors(int n)
         {
             n = Math.Clamp(n, 0, 10);
             if (n <= 0) return Array.Empty<System.Windows.Point>();
-            if (n == 1) return new[] { Px(0.50, _settings.HandYPct) };
+            
+            var (_, _, handY) = GetResponsiveYPositions();
+            
+            if (n == 1) return new[] { Px(0.50, handY) };
 
-            double start = 0.26, end = 0.74;
+            // Responsive hand positioning - adapts to screen width
+            double aspectRatio = Width / Height;
+            double baseWidth = _lastDetectedWidth > 0 ? _lastDetectedWidth : Width;
+            
+            // Adjust hand spread based on screen characteristics
+            double start = 0.32, end = 0.68;
+            
+            if (aspectRatio > 1.9) // Ultrawide
+            {
+                start = 0.38;
+                end = 0.62;
+            }
+            else if (baseWidth < 1366) // Smaller screens
+            {
+                start = 0.28;
+                end = 0.72;
+            }
+            
             return Enumerable.Range(0, n)
                 .Select(i =>
                 {
                     double t = i / (double)(n - 1);
-                    return Px(start + (end - start) * t, _settings.HandYPct);
+                    return Px(start + (end - start) * t, handY);
                 })
                 .ToArray();
         }
@@ -204,22 +426,73 @@ namespace TavernTally.App
             if (HudCanvas == null) return;
             HudCanvas.Children.Clear();
 
-            // Only show overlay when: settings enabled, Hearthstone in foreground, in Battlegrounds, AND in recruit/shop phase
-            if (!_settings.ShowOverlay || !_fg.HearthstoneIsForeground || !_state.InBattlegrounds || !_state.InRecruitPhase)
+            // Debug logging to help troubleshoot overlay issues
+            Log.Debug("RenderHud: ShowOverlay={ShowOverlay}, HearthstoneIsForeground={Foreground}, InBattlegrounds={InBG}, InRecruitPhase={InRecruit}, ManualMode={ManualMode}", 
+                _settings.ShowOverlay, _fg.HearthstoneIsForeground, _state.InBattlegrounds, _state.InRecruitPhase, _settings.ManualBattlegroundsMode);
+
+            // Show overlay when: settings enabled AND (Hearthstone in foreground AND (in Battlegrounds OR manual mode) AND in recruit phase)
+            // OR when DebugAlwaysShowOverlay is enabled for testing
+            bool inBattlegroundsMode = _state.InBattlegrounds || _settings.ManualBattlegroundsMode;
+            bool shouldShow = _settings.ShowOverlay && 
+                ((_fg.HearthstoneIsForeground && inBattlegroundsMode && _state.InRecruitPhase) || 
+                 _settings.DebugAlwaysShowOverlay);
+            
+            if (!shouldShow)
                 return;
 
+            Log.Information("Rendering overlay - Hand: {Hand}, Board: {Board}, Shop: {Shop} (Manual: {UseManual}, ManualShop: {ManualShop})", 
+                _state.HandCount, _state.BoardCount, _state.ShopCount, _state.UseManualCounts, _state.ManualShopCount);
+
+            // Use effective counts (manual overrides when available)
+            int effectiveShop = _state.EffectiveShopCount;
+            int effectiveHand = _state.EffectiveHandCount; 
+            int effectiveBoard = _state.EffectiveBoardCount;
+
+            Log.Information("Effective counts - Shop: {Shop}, Hand: {Hand}, Board: {Board}", effectiveShop, effectiveHand, effectiveBoard);
+
+            // If debug mode is enabled and no cards detected, show test overlays for positioning
+            if (_settings.DebugAlwaysShowOverlay && effectiveShop == 0 && effectiveHand == 0 && effectiveBoard == 0)
+            {
+                Log.Information("Debug mode: Showing test overlays for positioning");
+                
+                // Show detected window dimensions for debugging
+                AddLabel($"Detected: {_lastDetectedWidth}x{_lastDetectedHeight}", 0.02 * Width, 0.15 * Height);
+                AddLabel($"Overlay: {Width}x{Height}", 0.02 * Width, 0.20 * Height);
+                
+                // Add corner markers to see overlay window bounds
+                // Position right-side text well within window bounds to account for text width
+                AddLabel("TOP-LEFT", 0.02 * Width, 0.02 * Height);
+                AddLabel("TOP-RIGHT", 0.65 * Width, 0.02 * Height);  // Moved significantly left to stay within bounds
+                AddLabel("BOT-LEFT", 0.02 * Width, 0.90 * Height);  
+                AddLabel("BOT-RIGHT", 0.65 * Width, 0.90 * Height); // Moved significantly left to stay within bounds
+                
+                // Use proper positioning system for test overlays
+                var testShop = ShopAnchors(3); // Show 3 test shop cards
+                for (int i = 0; i < testShop.Length; i++)
+                    AddLabel($"SHOP {i + 1}", testShop[i].X, testShop[i].Y);
+                
+                var testBoard = BoardAnchors(4); // Show 4 test board cards
+                for (int i = 0; i < testBoard.Length; i++)
+                    AddLabel($"{(char)('A' + i)}", testBoard[i].X, testBoard[i].Y);
+                
+                var testHand = HandAnchors(2); // Show 2 test hand cards  
+                for (int i = 0; i < testHand.Length; i++)
+                    AddLabel($"HAND {i + 1}", testHand[i].X, testHand[i].Y);
+                return;
+            }
+
             // Shop numbers
-            var shop = ShopAnchors(_state.ShopCount);
+            var shop = ShopAnchors(effectiveShop);
             for (int i = 0; i < shop.Length; i++)
                 AddLabel((i + 1).ToString(), shop[i].X, shop[i].Y);
 
             // Board letters
-            var board = BoardAnchors(_state.BoardCount);
+            var board = BoardAnchors(effectiveBoard);
             for (int i = 0; i < board.Length; i++)
                 AddLabel(((char)('A' + i)).ToString(), board[i].X, board[i].Y);
 
             // Hand numbers
-            var hand = HandAnchors(_state.HandCount);
+            var hand = HandAnchors(effectiveHand);
             for (int i = 0; i < hand.Length; i++)
                 AddLabel((i + 1).ToString(), hand[i].X, hand[i].Y);
         }

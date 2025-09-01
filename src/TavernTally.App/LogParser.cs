@@ -1,3 +1,4 @@
+using System;
 using System.Text.RegularExpressions;
 using Serilog;
 
@@ -18,15 +19,18 @@ namespace TavernTally.App
         
         // ========== ZONE CHANGE DETECTION ==========
         
-        // Enhanced hand tracking with entity validation
-        static readonly Regex ReHandChange = new(@"ZONE_CHANGE Entity=.*\[(cardId=.*)\] zone=.*HAND.*zonePos=(\d+)", RegexOptions.Compiled);
-        static readonly Regex ReHandPlus = new(@"ZONE_CHANGE.*zone=.*->FRIENDLY HAND", RegexOptions.Compiled);
-        static readonly Regex ReHandMinus = new(@"ZONE_CHANGE.*zone=FRIENDLY HAND->", RegexOptions.Compiled);
+        // Enhanced zone tracking for accurate card counting
+        static readonly Regex ReZoneChange = new(@"ZONE_CHANGE Entity=\[.*id=(\d+).*cardId=([^\]]*)\] zone=([^-\s]+)\s*->\s*([^-\s]+).*zonePos=(\d+)", RegexOptions.Compiled);
+        static readonly Regex ReEntityInHand = new(@"tag=ZONE value=HAND.*Entity=\[.*id=(\d+)", RegexOptions.Compiled);
+        static readonly Regex ReEntityInPlay = new(@"tag=ZONE value=PLAY.*Entity=\[.*id=(\d+)", RegexOptions.Compiled);
         
-        // Enhanced board (play area) tracking
-        static readonly Regex ReBoardChange = new(@"ZONE_CHANGE Entity=.*\[(cardId=.*)\] zone=.*PLAY.*zonePos=(\d+)", RegexOptions.Compiled);
-        static readonly Regex ReBoardPlus = new(@"ZONE_CHANGE.*zone=.*->FRIENDLY PLAY", RegexOptions.Compiled);
-        static readonly Regex ReBoardMinus = new(@"ZONE_CHANGE.*zone=FRIENDLY PLAY->", RegexOptions.Compiled);
+        // Better patterns for Battlegrounds-specific zones
+        static readonly Regex ReShopCardRevealed = new(@"(HIDE_ENTITY|SHOW_ENTITY).*\[.*cardId=([^\]]*)\].*zone=SECRET", RegexOptions.Compiled);
+        static readonly Regex ReTavernBoardState = new(@"TAG_CHANGE.*BACON.*MINION_IN_TAVERN.*value=(\d+)", RegexOptions.Compiled);
+        
+        // Full entity tracking for precise counts
+        static readonly Regex ReFullEntity = new(@"FULL_ENTITY.*id=(\d+).*zone=(\w+).*cardId=([^\s]+)", RegexOptions.Compiled);
+        static readonly Regex ReTagChange = new(@"TAG_CHANGE Entity=\[.*id=(\d+).*\] tag=(\w+) value=(\w+)", RegexOptions.Compiled);
         
         // ========== BATTLEGROUNDS SPECIFIC ==========
         
@@ -34,6 +38,16 @@ namespace TavernTally.App
         static readonly Regex ReShopRefresh = new(@"(TAG_CHANGE.*GOLD.*value=\d+|TavernUpgrade|BACON.*REVEAL|Network.*TavernShopUI)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
         static readonly Regex ReTavernUpgrade = new(@"(TavernUpgrade|BACON.*TIER)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
         static readonly Regex ReShopOffer = new(@"(BACON.*OFFER|Network.*CardReveal)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        
+        // Battlegrounds card purchase/sale detection
+        static readonly Regex ReCardPurchased = new(@"(ZONE_CHANGE.*zone=FRIENDLY_SECRET.*->.*HAND|BUY_CARD|PURCHASE)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        static readonly Regex ReCardSold = new(@"(ZONE_CHANGE.*zone=.*HAND.*->.*GRAVEYARD|SELL_CARD)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        static readonly Regex ReMinionsPlayed = new(@"ZONE_CHANGE.*zone=.*HAND.*->.*PLAY", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        static readonly Regex ReMinionsRemoved = new(@"ZONE_CHANGE.*zone=.*PLAY.*->.*GRAVEYARD", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        
+        // Gold changes (indicating shop transactions)
+        static readonly Regex ReGoldChange = new(@"TAG_CHANGE.*tag=RESOURCES.*value=(\d+)", RegexOptions.Compiled);
+        static readonly Regex ReShopTransaction = new(@"(BACON.*BUY|BACON.*SELL)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
         
         // Combat and turn detection
         static readonly Regex ReCombatStart = new(@"(TAG_CHANGE.*MULLIGAN_STATE.*DONE|COMBAT_START)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
@@ -59,7 +73,12 @@ namespace TavernTally.App
                 // ===== GAME MODE DETECTION =====
                 CheckGameModeTransitions(line, s);
                 
-                // Only continue with BG-specific parsing if we're in Battlegrounds
+                // ===== BATTLEGROUNDS TRANSACTION DETECTION =====
+                // Check for shop transactions even if not yet detected as in Battlegrounds
+                // This helps catch transitions and provides more responsive detection
+                CheckShopTransactions(line, s);
+                
+                // Only continue with full BG-specific parsing if we're in Battlegrounds
                 if (!s.InBattlegrounds)
                     return;
                     
@@ -68,10 +87,33 @@ namespace TavernTally.App
                 CheckZoneChanges(line, s);
                 CheckShopAndTavern(line, s);
                 
+                // Initialize default values if we're in BG but have no counts yet
+                EnsureReasonableDefaults(s);
+                
+                // Enhanced logging for debugging
+                if (line.Contains("ZONE_CHANGE") || line.Contains("TAG_CHANGE") || line.Contains("BACON"))
+                {
+                    Log.Information("Parsed line: {Line}", line);
+                    Log.Debug("Current state: Shop={Shop}, Hand={Hand}, Board={Board}, Tier={Tier}, InBG={InBG}", 
+                        s.ShopCount, s.HandCount, s.BoardCount, s.TavernTier, s.InBattlegrounds);
+                }
+                
             }
             catch (System.Exception ex)
             {
                 Log.Warning(ex, "Error parsing log line: {Line}", line);
+            }
+        }
+        
+        private static void EnsureReasonableDefaults(BgState s)
+        {
+            // Ensure we have reasonable starting values for Battlegrounds
+            if (s.InBattlegrounds && s.ShopCount == 0)
+            {
+                // Start with tier 1 shop
+                s.SetShop(GetShopCountForTier(1));
+                s.SetTavernTier(1);
+                Log.Debug("Applied default shop count for Battlegrounds");
             }
         }
         
@@ -139,93 +181,268 @@ namespace TavernTally.App
         
         private static void CheckZoneChanges(string line, BgState s)
         {
-            // Enhanced hand tracking with position awareness
-            var handMatch = ReHandChange.Match(line);
-            if (handMatch.Success)
+            // Parse comprehensive zone changes for accurate counting
+            var zoneMatch = ReZoneChange.Match(line);
+            if (zoneMatch.Success)
             {
-                var cardId = handMatch.Groups[1].Value;
-                var position = handMatch.Groups[2].Value;
-                Log.Debug("Hand zone change: {CardId} at position {Position}", cardId, position);
+                var entityId = zoneMatch.Groups[1].Value;
+                var cardId = zoneMatch.Groups[2].Value;
+                var fromZone = zoneMatch.Groups[3].Value;
+                var toZone = zoneMatch.Groups[4].Value;
+                var position = zoneMatch.Groups[5].Value;
+                
+                Log.Debug("Zone change: Entity {EntityId} ({CardId}) from {FromZone} to {ToZone} at position {Position}", 
+                    entityId, cardId, fromZone, toZone, position);
+                
+                // Track cards entering/leaving friendly zones
+                UpdateCardCounts(s, fromZone, toZone, cardId);
             }
             
-            // Fallback to simpler patterns for basic counting
-            if (ReHandPlus.IsMatch(line))
+            // Specific detection for card purchases/sales
+            CheckShopTransactions(line, s);
+            
+            // Track full entity creation for more accurate counts
+            var entityMatch = ReFullEntity.Match(line);
+            if (entityMatch.Success)
             {
-                var newCount = s.HandCount + 1;
-                Log.Debug("Hand count increased: {OldCount} -> {NewCount}", s.HandCount, newCount);
-                s.SetHand(newCount);
+                var entityId = entityMatch.Groups[1].Value;
+                var zone = entityMatch.Groups[2].Value;
+                var cardId = entityMatch.Groups[3].Value;
+                
+                Log.Debug("Full entity: {EntityId} ({CardId}) in zone {Zone}", entityId, cardId, zone);
+                
+                // Update counts based on entity creation in zones
+                if (zone.Contains("HAND", StringComparison.OrdinalIgnoreCase))
+                {
+                    RecalculateHandCount(s);
+                }
+                else if (zone.Contains("PLAY", StringComparison.OrdinalIgnoreCase))
+                {
+                    RecalculateBoardCount(s);
+                }
             }
             
-            if (ReHandMinus.IsMatch(line))
+            // Track tavern-specific board state
+            var tavernMatch = ReTavernBoardState.Match(line);
+            if (tavernMatch.Success)
             {
-                var newCount = s.HandCount - 1;
-                Log.Debug("Hand count decreased: {OldCount} -> {NewCount}", s.HandCount, newCount);
-                s.SetHand(newCount);
+                var shopCount = int.Parse(tavernMatch.Groups[1].Value);
+                Log.Debug("Tavern board state: {ShopCount} minions", shopCount);
+                s.SetShop(shopCount);
+            }
+        }
+        
+        private static void CheckShopTransactions(string line, BgState s)
+        {
+            // Enhanced card purchase detection - multiple patterns for robustness
+            if (ReCardPurchased.IsMatch(line) || line.Contains("BUY_CARD") || line.Contains("PURCHASE"))
+            {
+                Log.Information("Card purchase detected: {Line}", line);
+                s.SetHand(s.HandCount + 1);
+                
+                // If not in BG mode but we're seeing purchases, might be a BG game
+                if (!s.InBattlegrounds)
+                {
+                    Log.Information("Purchase detected outside BG mode - checking if this is Battlegrounds");
+                    s.SetMode(true); // Assume Battlegrounds if we see purchases
+                }
             }
             
-            // Enhanced board tracking with position awareness
-            var boardMatch = ReBoardChange.Match(line);
-            if (boardMatch.Success)
+            // Enhanced card sale detection
+            if (ReCardSold.IsMatch(line) || line.Contains("SELL_CARD"))
             {
-                var cardId = boardMatch.Groups[1].Value;
-                var position = boardMatch.Groups[2].Value;
-                Log.Debug("Board zone change: {CardId} at position {Position}", cardId, position);
+                Log.Information("Card sale detected: {Line}", line);
+                s.SetHand(Math.Max(0, s.HandCount - 1));
+                
+                // If not in BG mode but we're seeing sales, might be a BG game
+                if (!s.InBattlegrounds)
+                {
+                    Log.Information("Sale detected outside BG mode - checking if this is Battlegrounds");
+                    s.SetMode(true); // Assume Battlegrounds if we see sales
+                }
             }
             
-            // Fallback to simpler patterns for basic counting
-            if (ReBoardPlus.IsMatch(line))
+            // Enhanced minion play detection
+            if (ReMinionsPlayed.IsMatch(line))
             {
-                var newCount = s.BoardCount + 1;
-                Log.Debug("Board count increased: {OldCount} -> {NewCount}", s.BoardCount, newCount);
-                s.SetBoard(newCount);
+                Log.Information("Minion played: {Line}", line);
+                s.SetHand(Math.Max(0, s.HandCount - 1));
+                s.SetBoard(s.BoardCount + 1);
             }
             
-            if (ReBoardMinus.IsMatch(line))
+            // Detect minions being removed from board
+            if (ReMinionsRemoved.IsMatch(line))
             {
-                var newCount = s.BoardCount - 1;
-                Log.Debug("Board count decreased: {OldCount} -> {NewCount}", s.BoardCount, newCount);
-                s.SetBoard(newCount);
+                Log.Information("Minion removed from board: {Line}", line);
+                s.SetBoard(Math.Max(0, s.BoardCount - 1));
             }
+            
+            // Detect general shop transactions
+            if (ReShopTransaction.IsMatch(line))
+            {
+                Log.Information("Shop transaction detected: {Line}", line);
+                // Trigger a state recalculation
+                EnsureReasonableDefaults(s);
+            }
+            
+            // Track gold changes as indicators of shop activity
+            var goldMatch = ReGoldChange.Match(line);
+            if (goldMatch.Success)
+            {
+                var goldAmount = goldMatch.Groups[1].Value;
+                Log.Debug("Gold changed to: {Gold}", goldAmount);
+                // Gold changes often accompany purchases/sales
+            }
+            
+            // Test for specific Battlegrounds keywords that indicate activity
+            if (line.Contains("BACON", StringComparison.OrdinalIgnoreCase) ||
+                line.Contains("TAVERN", StringComparison.OrdinalIgnoreCase) ||
+                line.Contains("BATTLEGROUNDS", StringComparison.OrdinalIgnoreCase))
+            {
+                Log.Debug("Battlegrounds-related activity detected: {Line}", line);
+                
+                // If we see BG activity but aren't in BG mode, enable it
+                if (!s.InBattlegrounds)
+                {
+                    Log.Information("Battlegrounds activity detected - enabling BG mode");
+                    s.SetMode(true);
+                }
+            }
+        }
+        
+        private static void UpdateCardCounts(BgState s, string fromZone, string toZone, string cardId)
+        {
+            // Only track meaningful card movements
+            if (string.IsNullOrEmpty(cardId) || cardId == "UNKNOWN")
+                return;
+                
+            bool fromHand = fromZone.Contains("HAND", StringComparison.OrdinalIgnoreCase);
+            bool toHand = toZone.Contains("HAND", StringComparison.OrdinalIgnoreCase);
+            bool fromPlay = fromZone.Contains("PLAY", StringComparison.OrdinalIgnoreCase);
+            bool toPlay = toZone.Contains("PLAY", StringComparison.OrdinalIgnoreCase);
+            bool fromSecret = fromZone.Contains("SECRET", StringComparison.OrdinalIgnoreCase);
+            bool toGraveyard = toZone.Contains("GRAVEYARD", StringComparison.OrdinalIgnoreCase);
+            
+            // Hand count changes
+            if (toHand && !fromHand)
+            {
+                s.SetHand(s.HandCount + 1);
+                Log.Information("Card added to hand: {CardId}, new count: {Count}", cardId, s.HandCount);
+            }
+            else if (fromHand && !toHand)
+            {
+                s.SetHand(Math.Max(0, s.HandCount - 1));
+                Log.Information("Card removed from hand: {CardId}, new count: {Count}", cardId, s.HandCount);
+            }
+            
+            // Board count changes
+            if (toPlay && !fromPlay)
+            {
+                s.SetBoard(s.BoardCount + 1);
+                Log.Information("Card added to board: {CardId}, new count: {Count}", cardId, s.BoardCount);
+            }
+            else if (fromPlay && !toPlay)
+            {
+                s.SetBoard(Math.Max(0, s.BoardCount - 1));
+                Log.Information("Card removed from board: {CardId}, new count: {Count}", cardId, s.BoardCount);
+            }
+            
+            // Special case: Cards from SECRET zone (shop) to HAND (purchase)
+            if (fromSecret && toHand)
+            {
+                Log.Information("Card purchased from shop: {CardId}", cardId);
+                // Hand count already updated above
+            }
+            
+            // Special case: Cards from HAND to GRAVEYARD (sell)
+            if (fromHand && toGraveyard)
+            {
+                Log.Information("Card sold: {CardId}", cardId);
+                // Hand count already updated above
+            }
+        }
+        
+        private static void RecalculateHandCount(BgState s)
+        {
+            // This would ideally maintain a list of entities and recalculate
+            // For now, we'll rely on the zone change tracking
+            Log.Debug("Hand recalculation triggered, current count: {Count}", s.HandCount);
+        }
+        
+        private static void RecalculateBoardCount(BgState s)
+        {
+            // This would ideally maintain a list of entities and recalculate
+            // For now, we'll rely on the zone change tracking
+            Log.Debug("Board recalculation triggered, current count: {Count}", s.BoardCount);
         }
         
         private static void CheckShopAndTavern(string line, BgState s)
         {
-            // Detect tavern upgrades
+            // Detect tavern upgrades and set appropriate shop count
             if (ReTavernUpgrade.IsMatch(line))
             {
                 Log.Debug("Tavern upgrade detected");
-                // Tavern upgrades typically increase shop offerings
-                var newShopCount = System.Math.Min(s.ShopCount + 1, 7);
+                var newTier = s.TavernTier + 1;
+                s.SetTavernTier(newTier);
+                
+                // Set shop count based on tavern tier
+                var newShopCount = GetShopCountForTier(newTier);
                 s.SetShop(newShopCount);
+                Log.Information("Tavern upgraded to tier {Tier}, shop now has {ShopCount} slots", newTier, newShopCount);
             }
             
-            // Detect shop refreshes
+            // Detect shop refreshes - maintain current tier's shop count
             if (ReShopRefresh.IsMatch(line))
             {
                 Log.Debug("Shop refresh detected");
-                // Improved shop count logic based on tavern tier
-                var newCount = CalculateShopCount(s.ShopCount);
-                s.SetShop(newCount);
+                var currentShopCount = GetShopCountForTier(s.TavernTier);
+                s.SetShop(currentShopCount);
+                Log.Debug("Shop refreshed, maintaining {ShopCount} slots for tier {Tier}", currentShopCount, s.TavernTier);
+            }
+            
+            // Detect shop card reveals for better counting
+            var shopCardMatch = ReShopCardRevealed.Match(line);
+            if (shopCardMatch.Success)
+            {
+                var cardId = shopCardMatch.Groups[2].Value;
+                Log.Debug("Shop card revealed: {CardId}", cardId);
+                
+                // Ensure shop count is at least as many as we're seeing
+                var expectedCount = GetShopCountForTier(s.TavernTier);
+                if (s.ShopCount < expectedCount)
+                {
+                    s.SetShop(expectedCount);
+                    Log.Debug("Adjusted shop count to {ShopCount} based on card reveals", expectedCount);
+                }
             }
             
             // Detect shop offerings for better counting
             if (ReShopOffer.IsMatch(line))
             {
                 Log.Debug("Shop offering detected");
+                // Ensure we have the correct shop count for current tier
+                var expectedCount = GetShopCountForTier(s.TavernTier);
+                if (s.ShopCount != expectedCount)
+                {
+                    s.SetShop(expectedCount);
+                    Log.Debug("Corrected shop count to {ShopCount} for tier {Tier}", expectedCount, s.TavernTier);
+                }
             }
         }
         
-        private static int CalculateShopCount(int currentCount)
+        private static int GetShopCountForTier(int tier)
         {
-            // More sophisticated shop count calculation
-            // In Battlegrounds, shop offerings depend on tavern tier:
-            // Tier 1: 3 minions, Tier 2: 4 minions, Tier 3+: 5+ minions
-            if (currentCount <= 0) return 3; // Start with tier 1
-            if (currentCount == 3) return 4; // Upgrade to tier 2
-            if (currentCount == 4) return 5; // Upgrade to tier 3
-            if (currentCount >= 5) return System.Math.Min(currentCount + 1, 7); // Cap at 7
-            
-            return currentCount;
+            // Battlegrounds shop slot count by tavern tier
+            return tier switch
+            {
+                1 => 3,  // Tier 1: 3 minions
+                2 => 4,  // Tier 2: 4 minions  
+                3 => 5,  // Tier 3: 5 minions
+                4 => 6,  // Tier 4: 6 minions
+                5 => 7,  // Tier 5: 7 minions
+                6 => 7,  // Tier 6: 7 minions (max)
+                _ => 3   // Default to tier 1
+            };
         }
     }
 }

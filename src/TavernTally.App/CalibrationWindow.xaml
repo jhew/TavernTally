@@ -32,9 +32,10 @@
                         <TextBlock Text="📋 Instructions" FontSize="14" FontWeight="Bold" Margin="0,0,0,10"/>
                         <TextBlock TextWrapping="Wrap" LineHeight="20">
                             1. Start Hearthstone and open a Battlegrounds game<LineBreak/>
-                            2. Use the sliders below to position overlay elements<LineBreak/>
+                            2. Use the sliders below to fine-tune overlay positions<LineBreak/>
                             3. Click "Test Overlay" to see live preview<LineBreak/>
                             4. Save your settings when positioned correctly<LineBreak/><LineBreak/>
+                            <Run FontWeight="Bold" Foreground="#27ae60">Responsive:</Run> The overlay automatically adapts to different screen sizes and resolutions. These settings serve as base values for fine-tuning.<LineBreak/>
                             <Run FontWeight="Bold" Foreground="#e67e22">Note:</Run> The overlay only appears during shop/recruit phases in actual gameplay.
                         </TextBlock>
                     </StackPanel>
@@ -58,11 +59,9 @@
                             </Grid.ColumnDefinitions>
                             
                             <TextBlock Grid.Row="0" Grid.Column="0" Text="Shop Y Position:" VerticalAlignment="Center" FontWeight="SemiBold"/>
-                            <Slider Grid.Row="0" Grid.Column="1" x:Name="ShopYSlider" Minimum="0" Maximum="1" Value="0.12" 
-                                    TickFrequency="0.01" IsSnapToTickEnabled="True" Margin="10,0"/>
-                            <TextBlock Grid.Row="0" Grid.Column="2" x:Name="ShopYValue" Text="12%" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                            
-                            <TextBlock Grid.Row="1" Grid.Column="1" Text="Position from top of Hearthstone window (tavern shop area)" 
+            <Slider Grid.Row="0" Grid.Column="1" x:Name="ShopYSlider" Minimum="0" Maximum="1" Value="0.19" 
+                    TickFrequency="0.01" IsSnapToTickEnabled="True" Margin="10,0"/>
+            <TextBlock Grid.Row="0" Grid.Column="2" x:Name="ShopYValue" Text="19%" HorizontalAlignment="Center" VerticalAlignment="Center"/>                            <TextBlock Grid.Row="1" Grid.Column="1" Text="Position from top of Hearthstone window (tavern shop area)" 
                                        FontSize="10" Foreground="#7f8c8d" Margin="10,2,0,0"/>
                         </Grid>
                         
@@ -79,11 +78,9 @@
                             </Grid.ColumnDefinitions>
                             
                             <TextBlock Grid.Row="0" Grid.Column="0" Text="Board Y Position:" VerticalAlignment="Center" FontWeight="SemiBold"/>
-                            <Slider Grid.Row="0" Grid.Column="1" x:Name="BoardYSlider" Minimum="0" Maximum="1" Value="0.63" 
-                                    TickFrequency="0.01" IsSnapToTickEnabled="True" Margin="10,0"/>
-                            <TextBlock Grid.Row="0" Grid.Column="2" x:Name="BoardYValue" Text="63%" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                            
-                            <TextBlock Grid.Row="1" Grid.Column="1" Text="Position for your minion board area" 
+            <Slider Grid.Row="0" Grid.Column="1" x:Name="BoardYSlider" Minimum="0" Maximum="1" Value="0.50" 
+                    TickFrequency="0.01" IsSnapToTickEnabled="True" Margin="10,0"/>
+            <TextBlock Grid.Row="0" Grid.Column="2" x:Name="BoardYValue" Text="50%" HorizontalAlignment="Center" VerticalAlignment="Center"/>                            <TextBlock Grid.Row="1" Grid.Column="1" Text="Position for your minion board area" 
                                        FontSize="10" Foreground="#7f8c8d" Margin="10,2,0,0"/>
                         </Grid>
                         
@@ -100,11 +97,9 @@
                             </Grid.ColumnDefinitions>
                             
                             <TextBlock Grid.Row="0" Grid.Column="0" Text="Hand Y Position:" VerticalAlignment="Center" FontWeight="SemiBold"/>
-                            <Slider Grid.Row="0" Grid.Column="1" x:Name="HandYSlider" Minimum="0" Maximum="1" Value="0.92" 
-                                    TickFrequency="0.01" IsSnapToTickEnabled="True" Margin="10,0"/>
-                            <TextBlock Grid.Row="0" Grid.Column="2" x:Name="HandYValue" Text="92%" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                            
-                            <TextBlock Grid.Row="1" Grid.Column="1" Text="Position for your hand card area" 
+            <Slider Grid.Row="0" Grid.Column="1" x:Name="HandYSlider" Minimum="0" Maximum="1" Value="0.86" 
+                    TickFrequency="0.01" IsSnapToTickEnabled="True" Margin="10,0"/>
+            <TextBlock Grid.Row="0" Grid.Column="2" x:Name="HandYValue" Text="86%" HorizontalAlignment="Center" VerticalAlignment="Center"/>                            <TextBlock Grid.Row="1" Grid.Column="1" Text="Position for your hand card area" 
                                        FontSize="10" Foreground="#7f8c8d" Margin="10,2,0,0"/>
                         </Grid>
                     </StackPanel>
