@@ -9,6 +9,7 @@
         Topmost="True"
         ShowInTaskbar="False"
         ResizeMode="NoResize"
+        Visibility="Hidden"
         Loaded="OnLoaded">
     <Canvas x:Name="HudCanvas"/>
 </Window>

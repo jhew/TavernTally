@@ -23,8 +23,8 @@ namespace TavernTally.App
         // ========== ENHANCED STATE TRACKING ==========
         public int TavernTier { get; private set; } = 1;
         public int TurnNumber { get; private set; }
-        public bool InCombat { get; private set; }
-        public bool InRecruitPhase { get; private set; } = true;
+        public bool InCombat { get; private set; } = false;
+        public bool InRecruitPhase { get; private set; } = false; // Start as false, detect when actually in recruit phase
         public DateTime LastStateChange { get; private set; } = DateTime.Now;
         
         // ========== STATE MANAGEMENT ==========
@@ -36,7 +36,7 @@ namespace TavernTally.App
             TavernTier = 1;
             TurnNumber = 0;
             InCombat = false;
-            InRecruitPhase = true;
+            InRecruitPhase = false; // Start as false, will be detected
             LastStateChange = DateTime.Now;
         }
 
@@ -54,7 +54,7 @@ namespace TavernTally.App
                     ShopCount = 3; // Tier 1 starts with 3 shop slots
                     HandCount = 0; // Start with no cards in hand
                     BoardCount = 0; // Start with no minions on board
-                    InRecruitPhase = true; // Start in recruit phase
+                    InRecruitPhase = false; // Will be detected from logs
                     InCombat = false;
                     Log.Information("Entered Battlegrounds - initialized with Tier 1, 3 shop slots");
                 }

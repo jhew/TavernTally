@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows;
@@ -25,6 +26,10 @@ namespace TavernTally.App
         public OverlayWindow()
         {
             InitializeComponent();               // <-- requires XAML class match
+            
+            // Start hidden by default - only show when appropriate conditions are met
+            this.Visibility = Visibility.Hidden;
+            
             SourceInitialized += (_, __) => MakeClickThrough();
             Loaded += OnLoaded;
             Closed += (_, __) =>
@@ -144,10 +149,6 @@ namespace TavernTally.App
                         var previousHand = _state.HandCount;
                         var previousBoard = _state.BoardCount;
                         
-                        // Debug: Log every line being processed to console for troubleshooting
-                        Console.WriteLine($"[LOGPARSE] {line}");
-                        Log.Information("Processing log line: {Line}", line);
-                        
                         LogParser.Apply(line, _state);
                         
                         // Trigger overlay update if any counts changed
@@ -158,13 +159,8 @@ namespace TavernTally.App
                             Dispatcher.Invoke(() => {
                                 Log.Information("State changed - updating overlay: Shop={Shop}, Hand={Hand}, Board={Board}", 
                                     _state.ShopCount, _state.HandCount, _state.BoardCount);
-                                Console.WriteLine($"[STATE_CHANGE] Shop={_state.ShopCount}, Hand={_state.HandCount}, Board={_state.BoardCount}");
                                 RenderHud();
                             });
-                        }
-                        else
-                        {
-                            Console.WriteLine($"[NO_CHANGE] Shop={_state.ShopCount}, Hand={_state.HandCount}, Board={_state.BoardCount}");
                         }
                     };
                     _tail.Start(powerLogPath);
@@ -172,16 +168,15 @@ namespace TavernTally.App
                 }
                 else
                 {
-                    // Log file exists but appears inactive - try auto-configuration silently
-                    Log.Information("Hearthstone log file found but appears inactive, attempting auto-configuration...");
-                    TryAutoConfigureLogging();
+                    // Log file exists but appears inactive - show restart message
+                    Log.Warning("Hearthstone log file found but appears inactive. Hearthstone may need to be restarted.");
+                    ShowLoggingRestartWarning();
                 }
             }
             else
             {
-                // No log file found - try auto-configuration silently
-                Log.Information("No Hearthstone log file found, attempting auto-configuration...");
-                TryAutoConfigureLogging();
+                // No log file found - check if logging is configured at all
+                CheckAndConfigureLogging();
             }
 
             // Foreground check
@@ -420,6 +415,29 @@ namespace TavernTally.App
                 .ToArray();
         }
 
+        private void ShowLoggingRestartWarning()
+        {
+            Log.Warning("Hearthstone logging appears inactive. Please restart Hearthstone for TavernTally to work properly.");
+            // Could show a user notification here in the future
+        }
+
+        private void CheckAndConfigureLogging()
+        {
+            Log.Information("No Hearthstone log file found. Checking if logging configuration is needed...");
+            
+            // Try to create/verify log.config file exists with correct settings
+            bool success = HearthstoneLogFinder.TryCreateLogConfig();
+            if (success)
+            {
+                Log.Information("Hearthstone logging configuration completed successfully. Please restart Hearthstone for changes to take effect.");
+            }
+            else
+            {
+                Log.Warning("Failed to configure Hearthstone logging automatically. Manual configuration may be required.");
+                Log.Information("Manual setup instructions: {Instructions}", HearthstoneLogFinder.GetLoggingInstructions());
+            }
+        }
+
         // ---------- Render ----------
         private void RenderHud()
         {
@@ -427,18 +445,40 @@ namespace TavernTally.App
             HudCanvas.Children.Clear();
 
             // Debug logging to help troubleshoot overlay issues
-            Log.Debug("RenderHud: ShowOverlay={ShowOverlay}, HearthstoneIsForeground={Foreground}, InBattlegrounds={InBG}, InRecruitPhase={InRecruit}, ManualMode={ManualMode}", 
+            Log.Information("RenderHud: ShowOverlay={ShowOverlay}, HearthstoneIsForeground={Foreground}, InBattlegrounds={InBG}, InRecruitPhase={InRecruit}, ManualMode={ManualMode}", 
                 _settings.ShowOverlay, _fg.HearthstoneIsForeground, _state.InBattlegrounds, _state.InRecruitPhase, _settings.ManualBattlegroundsMode);
 
-            // Show overlay when: settings enabled AND (Hearthstone in foreground AND (in Battlegrounds OR manual mode) AND in recruit phase)
-            // OR when DebugAlwaysShowOverlay is enabled for testing
+            // RELAXED CONDITIONS FOR DEBUGGING: Show status information when Hearthstone is foreground
             bool inBattlegroundsMode = _state.InBattlegrounds || _settings.ManualBattlegroundsMode;
             bool shouldShow = _settings.ShowOverlay && 
-                ((_fg.HearthstoneIsForeground && inBattlegroundsMode && _state.InRecruitPhase) || 
-                 _settings.DebugAlwaysShowOverlay);
+                              _fg.HearthstoneIsForeground && 
+                              inBattlegroundsMode && 
+                              _state.InRecruitPhase;
             
-            if (!shouldShow)
+            // Show debug info when Hearthstone is foreground (even if not in BG mode)
+            bool showDebugInfo = _settings.ShowOverlay && _fg.HearthstoneIsForeground;
+            
+            // Hide the entire window if no reason to show anything
+            if (!shouldShow && !showDebugInfo)
+            {
+                this.Visibility = Visibility.Hidden;
                 return;
+            }
+
+            // Show the window when we have something to display
+            this.Visibility = Visibility.Visible;
+
+            // If not in proper game mode, show debug status
+            if (!shouldShow && showDebugInfo)
+            {
+                AddLabel($"TavernTally Status:", 0.02 * Width, 0.05 * Height);
+                AddLabel($"Hearthstone Foreground: {_fg.HearthstoneIsForeground}", 0.02 * Width, 0.10 * Height);
+                AddLabel($"In Battlegrounds: {_state.InBattlegrounds}", 0.02 * Width, 0.15 * Height);
+                AddLabel($"In Recruit Phase: {_state.InRecruitPhase}", 0.02 * Width, 0.20 * Height);
+                AddLabel($"Manual Mode: {_settings.ManualBattlegroundsMode}", 0.02 * Width, 0.25 * Height);
+                AddLabel($"Press Ctrl+F8 for manual mode", 0.02 * Width, 0.30 * Height);
+                return;
+            }
 
             Log.Information("Rendering overlay - Hand: {Hand}, Board: {Board}, Shop: {Shop} (Manual: {UseManual}, ManualShop: {ManualShop})", 
                 _state.HandCount, _state.BoardCount, _state.ShopCount, _state.UseManualCounts, _state.ManualShopCount);
@@ -521,91 +561,6 @@ namespace TavernTally.App
             var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
             int exStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
             SetWindowLong(hwnd, GWL_EXSTYLE, exStyle | WS_EX_TRANSPARENT | WS_EX_LAYERED);
-        }
-
-        // ---------- Logging Setup ----------
-        private void TryAutoConfigureLogging()
-        {
-            try
-            {
-                Log.Information("Attempting automatic Hearthstone logging configuration...");
-                
-                bool success = HearthstoneLogFinder.TryCreateLogConfig();
-                
-                if (success)
-                {
-                    Log.Information("✅ Successfully auto-configured Hearthstone logging");
-                    
-                    // Only show a notification if this is the first time setup
-                    // Check if this is a first-time user by looking for any existing config
-                    var powerLogPath = HearthstoneLogFinder.FindPowerLog();
-                    if (powerLogPath == null)
-                    {
-                        // First time setup - show helpful notification
-                        System.Windows.MessageBox.Show(
-                            "✅ TavernTally has configured Hearthstone logging automatically!\n\n" +
-                            "Next steps:\n" +
-                            "• Restart Hearthstone (if it's running)\n" +
-                            "• Restart TavernTally\n\n" +
-                            "The overlay will then activate during Battlegrounds games.",
-                            "Setup Complete",
-                            System.Windows.MessageBoxButton.OK,
-                            System.Windows.MessageBoxImage.Information);
-                    }
-                }
-                else
-                {
-                    Log.Warning("Auto-configuration failed, user intervention may be required");
-                    
-                    // Only show dialog if auto-config fails and user needs to take action
-                    ShowLoggingSetupWindow(logFileExists: false, loggingActive: false);
-                }
-            }
-            catch (Exception ex)
-            {
-                Log.Error(ex, "Error during automatic logging configuration");
-                
-                // Only show dialog if there's an actual error that needs user attention
-                ShowLoggingSetupWindow(logFileExists: false, loggingActive: false);
-            }
-        }
-
-        private void ShowLoggingSetupWindow(bool logFileExists, bool loggingActive)
-        {
-            try
-            {
-                // This method is now only called when auto-configuration has failed
-                // and user intervention is actually needed
-                
-                string message = "⚠️ TavernTally could not automatically configure Hearthstone logging.\n\n" +
-                               "This might happen if:\n" +
-                               "• Hearthstone is installed in a custom location\n" +
-                               "• You don't have write permissions\n" +
-                               "• Hearthstone is currently running\n\n" +
-                               "Would you like to see manual setup instructions?";
-
-                var result = System.Windows.MessageBox.Show(
-                    message,
-                    "TavernTally - Manual Setup Required",
-                    System.Windows.MessageBoxButton.YesNo,
-                    System.Windows.MessageBoxImage.Warning);
-
-                if (result == System.Windows.MessageBoxResult.Yes)
-                {
-                    // Show manual instructions
-                    System.Windows.MessageBox.Show(
-                        HearthstoneLogFinder.GetLoggingInstructions(),
-                        "Manual Setup Instructions",
-                        System.Windows.MessageBoxButton.OK,
-                        System.Windows.MessageBoxImage.Information);
-                }
-                
-                // If user clicks No, just continue - they can access setup later via tray menu if needed
-            }
-            catch (Exception ex)
-            {
-                Log.Error(ex, "Error showing logging setup window");
-            }
         }
 
         private const int GWL_EXSTYLE = -20;
