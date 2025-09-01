@@ -91,13 +91,17 @@ namespace TavernTally.App
                 _stream.Position = _pos;
                 string? line;
                 while ((line = _reader.ReadLine()) != null)
+                {
+                    Console.WriteLine($"[LOGTAIL] Read line: {line}");
                     OnLine?.Invoke(line);
+                }
                 _pos = _stream.Position;
             }
             catch (Exception ex)
             {
                 // Log the error but continue operation
                 System.Diagnostics.Debug.WriteLine($"LogTail.Pump error: {ex.Message}");
+                Console.WriteLine($"[LOGTAIL] Error: {ex.Message}");
             }
         }
 

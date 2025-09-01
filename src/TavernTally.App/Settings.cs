@@ -9,9 +9,10 @@ namespace TavernTally.App
     {
         private bool _showOverlay = true;
         private double _uiScale = 1.0;
-        private double _shopYPct = 0.12;
-        private double _boardYPct = 0.63;
-        private double _handYPct = 0.92;
+        // Responsive positioning - these values serve as base/fallback values that can be user-adjusted
+        private double _shopYPct = 0.19;   // Base shop Y position (will be adjusted dynamically)
+        private double _boardYPct = 0.50;  // Base board Y position (will be adjusted dynamically)  
+        private double _handYPct = 0.86;   // Base hand Y position (will be adjusted dynamically)
 
         public bool ShowOverlay 
         { 
@@ -20,6 +21,9 @@ namespace TavernTally.App
         }
 
         public bool DebugAlwaysShowOverlay { get; set; } = true; // temporarily force-draw overlay to align
+        
+        // Manual Battlegrounds mode toggle - for when log detection fails
+        public bool ManualBattlegroundsMode { get; set; } = false;
 
         public double UiScale 
         { 

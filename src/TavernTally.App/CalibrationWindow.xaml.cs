@@ -163,17 +163,17 @@ namespace TavernTally.App
         {
             var result = System.Windows.MessageBox.Show(
                 "Reset all calibration settings to defaults?\n\nThis will restore:\n" +
-                "• Shop Y: 12%\n• Board Y: 63%\n• Hand Y: 92%\n• UI Scale: 100%\n• Offsets: 0px",
+                "• Shop Y: 15%\n• Board Y: 42%\n• Hand Y: 85%\n• UI Scale: 100%\n• Offsets: 0px",
                 "Reset Calibration",
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Question);
                 
             if (result == MessageBoxResult.Yes)
             {
-                // Reset to defaults
-                _settings.ShopYPct = 0.12;
-                _settings.BoardYPct = 0.63;
-                _settings.HandYPct = 0.92;
+                // Reset to defaults (fine-tuned for 4K card alignment)
+                _settings.ShopYPct = 0.15;
+                _settings.BoardYPct = 0.42;
+                _settings.HandYPct = 0.85;
                 _settings.UiScale = 1.0;
                 _settings.OffsetX = 0;
                 _settings.OffsetY = 0;

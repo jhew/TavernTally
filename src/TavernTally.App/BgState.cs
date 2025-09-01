@@ -1,4 +1,5 @@
 using System;
+using Serilog;
 
 namespace TavernTally.App
 {
@@ -9,6 +10,15 @@ namespace TavernTally.App
         public int HandCount  { get; private set; }
         public int BoardCount { get; private set; }
         public int ShopCount  { get; private set; }
+        
+        // ========== MANUAL OVERRIDE COUNTS ==========
+        public int ManualShopCount { get; set; }
+        public bool UseManualCounts { get; set; }
+        
+        // Effective counts (manual overrides when enabled, otherwise parsed counts)
+        public int EffectiveShopCount => UseManualCounts ? ManualShopCount : ShopCount;
+        public int EffectiveHandCount => UseManualCounts ? 0 : HandCount; // Show hand count when not in manual mode
+        public int EffectiveBoardCount => UseManualCounts ? 0 : BoardCount; // Show board count when not in manual mode
         
         // ========== ENHANCED STATE TRACKING ==========
         public int TavernTier { get; private set; } = 1;
@@ -37,9 +47,20 @@ namespace TavernTally.App
                 InBattlegrounds = inBg;
                 LastStateChange = DateTime.Now;
                 
-                // Reset sub-states when entering/exiting Battlegrounds
-                if (!inBg)
+                // Initialize with reasonable defaults when entering Battlegrounds
+                if (inBg)
                 {
+                    TavernTier = 1;
+                    ShopCount = 3; // Tier 1 starts with 3 shop slots
+                    HandCount = 0; // Start with no cards in hand
+                    BoardCount = 0; // Start with no minions on board
+                    InRecruitPhase = true; // Start in recruit phase
+                    InCombat = false;
+                    Log.Information("Entered Battlegrounds - initialized with Tier 1, 3 shop slots");
+                }
+                else
+                {
+                    // Reset sub-states when exiting Battlegrounds
                     Reset();
                 }
             }

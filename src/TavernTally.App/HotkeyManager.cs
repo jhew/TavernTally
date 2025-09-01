@@ -14,6 +14,9 @@ namespace TavernTally.App
         public event Action? ToggleOverlay;
         public event Action? IncreaseScale;
         public event Action? DecreaseScale;
+        public event Action? ToggleManualBattlegrounds;
+        public event Action? IncreaseShopCount;
+        public event Action? DecreaseShopCount;
 
         public HotkeyManager(Window window) { _window = window; }
 
@@ -28,6 +31,12 @@ namespace TavernTally.App
             RegisterHotKey(_source.Handle, 2, MOD_CONTROL, 0xBB);
             // Ctrl+-
             RegisterHotKey(_source.Handle, 3, MOD_CONTROL, 0xBD);
+            // Ctrl+F8 (Manual Battlegrounds toggle)
+            RegisterHotKey(_source.Handle, 4, MOD_CONTROL, 0x77);
+            // Ctrl+Shift+= (Increase shop count)
+            RegisterHotKey(_source.Handle, 5, MOD_CONTROL | MOD_SHIFT, 0xBB);
+            // Ctrl+Shift+- (Decrease shop count)  
+            RegisterHotKey(_source.Handle, 6, MOD_CONTROL | MOD_SHIFT, 0xBD);
         }
 
         public void Unregister()
@@ -36,6 +45,9 @@ namespace TavernTally.App
             UnregisterHotKey(_source.Handle, 1);
             UnregisterHotKey(_source.Handle, 2);
             UnregisterHotKey(_source.Handle, 3);
+            UnregisterHotKey(_source.Handle, 4);
+            UnregisterHotKey(_source.Handle, 5);
+            UnregisterHotKey(_source.Handle, 6);
             _source.RemoveHook(WndProc);
             _source = null;
         }
@@ -48,6 +60,9 @@ namespace TavernTally.App
                 if (id == 1) ToggleOverlay?.Invoke();
                 else if (id == 2) IncreaseScale?.Invoke();
                 else if (id == 3) DecreaseScale?.Invoke();
+                else if (id == 4) ToggleManualBattlegrounds?.Invoke();
+                else if (id == 5) IncreaseShopCount?.Invoke();
+                else if (id == 6) DecreaseShopCount?.Invoke();
                 handled = true;
             }
             return IntPtr.Zero;
@@ -56,6 +71,7 @@ namespace TavernTally.App
         public void Dispose() => Unregister();
 
         private const uint MOD_CONTROL = 0x0002;
+        private const uint MOD_SHIFT = 0x0004;
         [DllImport("user32.dll")] private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
         [DllImport("user32.dll")] private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
     }
