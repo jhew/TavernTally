@@ -1,5 +1,5 @@
 using System;
-using TavernTally.App;
+using TavernTally;
 
 class Program
 {

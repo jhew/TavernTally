@@ -4,7 +4,7 @@ using System.IO;
 using System.Linq;
 using Serilog;
 
-namespace TavernTally.App
+namespace TavernTally
 {
     /// <summary>
     /// Discovers Hearthstone log files across multiple potential installation locations
@@ -17,9 +17,87 @@ namespace TavernTally.App
         /// <returns>The path to Power.log if found, null otherwise</returns>
         public static string? FindPowerLog()
         {
+            // PRIORITY FIX: Check the known active session directory first
+            var knownActivePath = @"C:\Program Files (x86)\Hearthstone\Logs";
+            if (Directory.Exists(knownActivePath))
+            {
+                Log.Information("🔍 Checking known active Hearthstone logs directory: {Path}", knownActivePath);
+                
+                var sessionDirs = Directory.GetDirectories(knownActivePath, "Hearthstone_*")
+                    .OrderByDescending(d => new DirectoryInfo(d).LastWriteTime)
+                    .ToList();
+                
+                Log.Information("📁 Found {Count} session directories", sessionDirs.Count);
+                
+                foreach (var sessionDir in sessionDirs.Take(3))
+                {
+                    var powerLogPath = Path.Combine(sessionDir, "Power.log");
+                    var sessionName = Path.GetFileName(sessionDir);
+                    Log.Information("  📂 Checking session: {Session}", sessionName);
+                    
+                    if (File.Exists(powerLogPath))
+                    {
+                        var fileInfo = new FileInfo(powerLogPath);
+                        var isRecentFile = (DateTime.Now - fileInfo.LastWriteTime).TotalMinutes < 60;
+                        var sizeKB = fileInfo.Length / 1024.0;
+                        
+                        Log.Information("  ✅ Found Power.log: {Path}", powerLogPath);
+                        Log.Information("  📊 Size: {Size:F1} KB, Modified: {Modified}, Recent: {Recent}", 
+                            sizeKB, fileInfo.LastWriteTime, isRecentFile);
+                        
+                        // Sample a few lines from the file to verify content
+                        try
+                        {
+                            var sampleLines = File.ReadLines(powerLogPath).Take(5).ToList();
+                            Log.Information("  📄 Sample lines from Power.log:");
+                            foreach (var line in sampleLines)
+                            {
+                                Log.Information("    {Line}", line);
+                            }
+                            
+                            // Also check the last few lines
+                            var allLines = File.ReadAllLines(powerLogPath);
+                            if (allLines.Length > 5)
+                            {
+                                Log.Information("  📄 Recent lines from Power.log:");
+                                foreach (var line in allLines.TakeLast(3))
+                                {
+                                    Log.Information("    {Line}", line);
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Log.Warning(ex, "  ❌ Could not read sample from Power.log");
+                        }
+                        
+                        // Prefer recent files, but return any active session log
+                        if (isRecentFile || fileInfo.Length > 1000)
+                        {
+                            Log.Information("✅ USING THIS POWER.LOG: {Path}", powerLogPath);
+                            return powerLogPath;
+                        }
+                    }
+                    else
+                    {
+                        Log.Information("  ❌ No Power.log in session: {Session}", sessionName);
+                    }
+                }
+            }
+            else
+            {
+                Log.Warning("❌ Known active path does not exist: {Path}", knownActivePath);
+            }
+            
             var potentialPaths = GetPotentialLogPaths();
             
             Log.Information("Searching for Hearthstone Power.log in {Count} potential locations", potentialPaths.Count);
+            
+            // Log all paths being checked for debugging
+            for (int i = 0; i < potentialPaths.Count; i++)
+            {
+                Log.Information("  [{Index}] Checking: {Path}", i + 1, potentialPaths[i]);
+            }
             
             foreach (var path in potentialPaths)
             {
@@ -28,18 +106,23 @@ namespace TavernTally.App
                     if (File.Exists(path))
                     {
                         var fileInfo = new FileInfo(path);
-                        Log.Information("Found Power.log at: {Path} (Size: {Size} bytes, Modified: {Modified})", 
-                            path, fileInfo.Length, fileInfo.LastWriteTime);
+                        var isRecentFile = (DateTime.Now - fileInfo.LastWriteTime).TotalMinutes < 60;
+                        
+                        Log.Information("✓ Found Power.log at: {Path}", path);
+                        Log.Information("  Size: {Size} bytes, Modified: {Modified}, Recent: {Recent}", 
+                            fileInfo.Length, fileInfo.LastWriteTime, isRecentFile);
+                            
+                        // Return the first found file (session-based logs are checked first)
                         return path;
                     }
                     else
                     {
-                        Log.Debug("Power.log not found at: {Path}", path);
+                        Log.Debug("✗ Power.log not found at: {Path}", path);
                     }
                 }
                 catch (Exception ex)
                 {
-                    Log.Warning(ex, "Error checking path: {Path}", path);
+                    Log.Warning(ex, "✗ Error checking path: {Path}", path);
                 }
             }
             
@@ -53,6 +136,9 @@ namespace TavernTally.App
         private static List<string> GetPotentialLogPaths()
         {
             var paths = new List<string>();
+            
+            // PRIORITY: Check for session-based logs first (most recent installations)
+            AddSessionBasedLogPaths(paths);
             
             // Standard Blizzard App installation (most common)
             var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
@@ -97,6 +183,87 @@ namespace TavernTally.App
             
             // Remove duplicates and invalid paths
             return paths.Distinct().Where(p => !string.IsNullOrEmpty(p)).ToList();
+        }
+
+        /// <summary>
+        /// Adds session-based log paths (modern Hearthstone installations that create timestamped session directories)
+        /// </summary>
+        private static void AddSessionBasedLogPaths(List<string> paths)
+        {
+            var potentialBasePaths = new List<string>();
+            
+            // Program Files installations
+            var programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+            var programFilesX86 = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86);
+            
+            potentialBasePaths.Add(Path.Combine(programFiles, "Hearthstone", "Logs"));
+            potentialBasePaths.Add(Path.Combine(programFilesX86, "Hearthstone", "Logs"));
+            potentialBasePaths.Add(Path.Combine(programFiles, "Blizzard", "Hearthstone", "Logs"));
+            potentialBasePaths.Add(Path.Combine(programFilesX86, "Blizzard", "Hearthstone", "Logs"));
+            
+            // Check process-based paths for session directories
+            var hsProcessPaths = GetHearthstoneProcessPaths();
+            foreach (var processPath in hsProcessPaths)
+            {
+                var logsDir = Path.Combine(Path.GetDirectoryName(processPath) ?? "", "Logs");
+                potentialBasePaths.Add(logsDir);
+            }
+            
+            // For each base path, look for session directories and find the most recent Power.log
+            foreach (var basePath in potentialBasePaths)
+            {
+                try
+                {
+                    if (!Directory.Exists(basePath))
+                    {
+                        Log.Debug("Session base path does not exist: {BasePath}", basePath);
+                        continue;
+                    }
+                        
+                    Log.Information("✓ Checking for session-based logs in: {BasePath}", basePath);
+                    
+                    // Look for session directories (format: Hearthstone_YYYY_MM_DD_HH_MM_SS)
+                    var allDirs = Directory.GetDirectories(basePath, "Hearthstone_*");
+                    Log.Information("  Found {Count} directories starting with 'Hearthstone_'", allDirs.Length);
+                    
+                    var sessionDirs = allDirs
+                        .Where(d => {
+                            var dirName = Path.GetFileName(d);
+                            // More flexible pattern matching for session directories
+                            var isSessionDir = System.Text.RegularExpressions.Regex.IsMatch(dirName, 
+                                @"^Hearthstone_\d{4}_\d{2}_\d{2}");
+                            Log.Debug("    Directory: {Dir}, IsSession: {IsSession}", dirName, isSessionDir);
+                            return isSessionDir;
+                        })
+                        .OrderByDescending(d => new DirectoryInfo(d).LastWriteTime)
+                        .ToList();
+                    
+                    Log.Information("  Found {Count} session directories", sessionDirs.Count);
+                    
+                    // Add Power.log from the most recent sessions (check top 3 for robustness)
+                    foreach (var sessionDir in sessionDirs.Take(3))
+                    {
+                        var powerLogPath = Path.Combine(sessionDir, "Power.log");
+                        var sessionName = Path.GetFileName(sessionDir);
+                        
+                        if (File.Exists(powerLogPath))
+                        {
+                            var fileInfo = new FileInfo(powerLogPath);
+                            paths.Add(powerLogPath);
+                            Log.Information("  ✓ Found session Power.log: {Session} (Size: {Size}, Modified: {Modified})", 
+                                sessionName, fileInfo.Length, fileInfo.LastWriteTime);
+                        }
+                        else
+                        {
+                            Log.Debug("  ✗ No Power.log in session: {Session}", sessionName);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning(ex, "Error checking session-based logs in: {BasePath}", basePath);
+                }
+            }
         }
 
         /// <summary>

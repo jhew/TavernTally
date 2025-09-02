@@ -6,7 +6,7 @@
 1. Go to [Releases](https://github.com/jhew/TavernTally/releases)
 2. Download the latest `TavernTally-Portable-v*.zip` file  
 3. Extract to any folder (e.g., `C:\TavernTally\` or `Desktop\TavernTally\`)
-4. Run `TavernTally.App.exe`
+4. Run `TavernTally.exe`
 5. **No installation required!** - Just extract and run
 
 ### Benefits of Portable Version:

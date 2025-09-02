@@ -4,7 +4,7 @@ using Serilog;
 using Serilog.Events;
 using Serilog.Sinks.Async;
 
-namespace TavernTally.App
+namespace TavernTally
 {
     public static class Logging
     {

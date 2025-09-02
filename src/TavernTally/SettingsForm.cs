@@ -5,7 +5,7 @@ using System.Reflection;
 using System.Windows.Forms;
 using Microsoft.Win32;
 
-namespace TavernTally.App
+namespace TavernTally
 {
     internal sealed class SettingsForm : Form
     {

@@ -30,7 +30,7 @@ jobs:
       
       - name: Publish self-contained application
         run: |
-          dotnet publish ./src/TavernTally.App/TavernTally.App.csproj `
+          dotnet publish ./src/TavernTally/TavernTally.csproj `
             -c Release `
             -f net8.0-windows `
             -o ./publish `

@@ -4,7 +4,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Timers;
 
-namespace TavernTally.App
+namespace TavernTally
 {
     public class ForegroundWatcher : IDisposable
     {

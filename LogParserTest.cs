@@ -1,5 +1,5 @@
 using System;
-using TavernTally.App;
+using TavernTally;
 
 class LogParserTest
 {
@@ -8,7 +8,7 @@ class LogParserTest
         Console.WriteLine("=== TavernTally Enhanced Log Parser Test ===\n");
         
         // Initialize logging (normally done in App startup)
-        TavernTally.App.Logging.Init();
+        TavernTally.Logging.Init();
         
         var state = new BgState();
         

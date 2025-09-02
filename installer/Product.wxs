@@ -14,7 +14,7 @@
 
     <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
       <Component>
-        <File Source="$(var.SourceDir)\TavernTally.App.exe" />
+        <File Source="$(var.SourceDir)\TavernTally.exe" />
       </Component>
       <Component>
         <File Source="$(var.SourceDir)\app.ico" />
