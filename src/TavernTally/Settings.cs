@@ -3,7 +3,7 @@ using System.IO;
 using System.Text.Json;
 using Serilog;
 
-namespace TavernTally.App
+namespace TavernTally
 {
     public class Settings
     {

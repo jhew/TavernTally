@@ -7,7 +7,9 @@
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <StartupObject>TavernTally.App.Program</StartupObject>
+    <StartupObject>TavernTally.Program</StartupObject>
+    <AssemblyName>TavernTally</AssemblyName>
+    <RootNamespace>TavernTally</RootNamespace>
 
     <!-- IMPORTANT: keep defaults ON so the SDK auto-includes *.xaml, *.xaml.cs, *.cs -->
     <EnableDefaultItems>true</EnableDefaultItems>

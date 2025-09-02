@@ -6,7 +6,7 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using System.Threading.Tasks;
 
-namespace TavernTally.App
+namespace TavernTally
 {
     public static class SimpleUpdater
     {

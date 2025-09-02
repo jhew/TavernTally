@@ -1,7 +1,7 @@
 using System;
 using Serilog;
 
-namespace TavernTally.App
+namespace TavernTally
 {
     public class BgState
     {
@@ -26,6 +26,7 @@ namespace TavernTally.App
         public bool InCombat { get; private set; } = false;
         public bool InRecruitPhase { get; private set; } = false; // Start as false, detect when actually in recruit phase
         public DateTime LastStateChange { get; private set; } = DateTime.Now;
+        public DateTime LastBattlegroundsActivity { get; private set; } = DateTime.Now;
         
         // ========== STATE MANAGEMENT ==========
         
@@ -38,6 +39,7 @@ namespace TavernTally.App
             InCombat = false;
             InRecruitPhase = false; // Start as false, will be detected
             LastStateChange = DateTime.Now;
+            LastBattlegroundsActivity = DateTime.Now; // Reset activity timestamp too
         }
 
         public void SetMode(bool inBg)  
@@ -47,21 +49,12 @@ namespace TavernTally.App
                 InBattlegrounds = inBg;
                 LastStateChange = DateTime.Now;
                 
-                // Initialize with reasonable defaults when entering Battlegrounds
                 if (inBg)
                 {
-                    TavernTier = 1;
-                    ShopCount = 3; // Tier 1 starts with 3 shop slots
-                    HandCount = 0; // Start with no cards in hand
-                    BoardCount = 0; // Start with no minions on board
-                    InRecruitPhase = false; // Will be detected from logs
-                    InCombat = false;
-                    Log.Information("Entered Battlegrounds - initialized with Tier 1, 3 shop slots");
-                }
-                else
-                {
-                    // Reset sub-states when exiting Battlegrounds
-                    Reset();
+                    LastBattlegroundsActivity = DateTime.Now;
+                    // Initialize with reasonable defaults when entering Battlegrounds
+                    if (ShopCount == 0) ShopCount = 3; // Default tier 1 shop
+                    if (TavernTier == 0) TavernTier = 1;
                 }
             }
         }
@@ -94,43 +87,8 @@ namespace TavernTally.App
                 ShopCount = newCount;
                 LastStateChange = DateTime.Now;
                 
-                // Update tavern tier based on shop count
-                UpdateTavernTierFromShopCount(newCount);
-            }
-        }
-        
-        // ========== ENHANCED STATE SETTERS ==========
-        
-        public void SetTavernTier(int tier)
-        {
-            var newTier = Clamp(tier, 1, 6);
-            if (TavernTier != newTier)
-            {
-                TavernTier = newTier;
-                LastStateChange = DateTime.Now;
-                
-                // Update shop count to match tavern tier
-                UpdateShopCountFromTavernTier(newTier);
-            }
-        }
-        
-        public void SetTurn(int turn)
-        {
-            var newTurn = Math.Max(0, turn);
-            if (TurnNumber != newTurn)
-            {
-                TurnNumber = newTurn;
-                LastStateChange = DateTime.Now;
-            }
-        }
-        
-        public void SetCombatPhase(bool inCombat)
-        {
-            if (InCombat != inCombat)
-            {
-                InCombat = inCombat;
-                InRecruitPhase = !inCombat; // Combat and recruit phases are mutually exclusive
-                LastStateChange = DateTime.Now;
+                // Update tavern tier based on shop count if it makes sense
+                UpdateTavernTierFromShopCount(ShopCount);
             }
         }
         
@@ -144,6 +102,23 @@ namespace TavernTally.App
             }
         }
         
+        // ========== ACTIVITY TRACKING ==========
+        
+        public void UpdateBattlegroundsActivity()
+        {
+            if (InBattlegrounds)
+            {
+                LastBattlegroundsActivity = DateTime.Now;
+            }
+        }
+        
+        public bool ShouldAutoReset()
+        {
+            // Auto-reset if we've been in "Battlegrounds" mode for 10+ seconds without any BG activity
+            return InBattlegrounds && 
+                   (DateTime.Now - LastBattlegroundsActivity).TotalSeconds > 10;
+        }
+        
         // ========== HELPER METHODS ==========
         
         private static int Clamp(int v, int lo, int hi) => v < lo ? lo : (v > hi ? hi : v);
@@ -153,37 +128,18 @@ namespace TavernTally.App
             // Infer tavern tier from shop count (Battlegrounds logic)
             int inferredTier = shopCount switch
             {
-                3 => 1,
-                4 => 2,
-                5 => 3,
-                6 => 4,
-                7 => 5,
-                _ => TavernTier // Keep current if unclear
+                3 => 1,  // Tier 1: 3 shop slots
+                4 => 2,  // Tier 2: 4 shop slots
+                5 => 3,  // Tier 3: 5 shop slots
+                6 => 4,  // Tier 4: 6 shop slots
+                7 => 5,  // Tier 5+: 7 shop slots
+                _ => TavernTier // Keep current tier if shop count doesn't match expected pattern
             };
-            
-            if (TavernTier != inferredTier && inferredTier >= 1 && inferredTier <= 6)
+
+            if (inferredTier != TavernTier && inferredTier >= 1 && inferredTier <= 6)
             {
                 TavernTier = inferredTier;
-            }
-        }
-        
-        private void UpdateShopCountFromTavernTier(int tier)
-        {
-            // Update shop count based on tavern tier (Battlegrounds logic)
-            int expectedShopCount = tier switch
-            {
-                1 => 3,
-                2 => 4,
-                3 => 5,
-                4 => 6,
-                5 => 7,
-                6 => 7,
-                _ => ShopCount // Keep current if unclear
-            };
-            
-            if (ShopCount != expectedShopCount)
-            {
-                ShopCount = expectedShopCount;
+                Log.Information("Tavern tier updated to {Tier} based on shop count {ShopCount}", TavernTier, shopCount);
             }
         }
         

@@ -1,4 +1,4 @@
-<Window x:Class="TavernTally.App.OverlayWindow"
+<Window x:Class="TavernTally.OverlayWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="OverlayWindow"
@@ -11,5 +11,6 @@
         ResizeMode="NoResize"
         Visibility="Hidden"
         Loaded="OnLoaded">
-    <Canvas x:Name="HudCanvas"/>
+    <Canvas x:Name="HudCanvas">
+    </Canvas>
 </Window>

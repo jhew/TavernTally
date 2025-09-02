@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
 
-namespace TavernTally.App
+namespace TavernTally
 {
     public class HotkeyManager : IDisposable
     {
@@ -17,6 +17,7 @@ namespace TavernTally.App
         public event Action? ToggleManualBattlegrounds;
         public event Action? IncreaseShopCount;
         public event Action? DecreaseShopCount;
+        public event Action? ResetBattlegrounds;
 
         public HotkeyManager(Window window) { _window = window; }
 
@@ -37,6 +38,8 @@ namespace TavernTally.App
             RegisterHotKey(_source.Handle, 5, MOD_CONTROL | MOD_SHIFT, 0xBB);
             // Ctrl+Shift+- (Decrease shop count)  
             RegisterHotKey(_source.Handle, 6, MOD_CONTROL | MOD_SHIFT, 0xBD);
+            // Ctrl+F9 (Reset Battlegrounds detection)
+            RegisterHotKey(_source.Handle, 7, MOD_CONTROL, 0x78);
         }
 
         public void Unregister()
@@ -48,6 +51,7 @@ namespace TavernTally.App
             UnregisterHotKey(_source.Handle, 4);
             UnregisterHotKey(_source.Handle, 5);
             UnregisterHotKey(_source.Handle, 6);
+            UnregisterHotKey(_source.Handle, 7);
             _source.RemoveHook(WndProc);
             _source = null;
         }
@@ -63,6 +67,7 @@ namespace TavernTally.App
                 else if (id == 4) ToggleManualBattlegrounds?.Invoke();
                 else if (id == 5) IncreaseShopCount?.Invoke();
                 else if (id == 6) DecreaseShopCount?.Invoke();
+                else if (id == 7) ResetBattlegrounds?.Invoke();
                 handled = true;
             }
             return IntPtr.Zero;

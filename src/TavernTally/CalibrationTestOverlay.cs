@@ -6,7 +6,7 @@ using System.Windows.Media;
 using System.Windows.Media.Effects;
 using System.Runtime.InteropServices;
 
-namespace TavernTally.App
+namespace TavernTally
 {
     /// <summary>
     /// A test overlay window used during calibration to show how the overlay will appear

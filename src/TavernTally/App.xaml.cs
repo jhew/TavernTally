@@ -3,7 +3,7 @@ using System.Threading;
 using System.Windows;
 using Serilog;
 
-namespace TavernTally.App
+namespace TavernTally
 {
     public partial class App : System.Windows.Application
     {

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
-namespace TavernTally.App
+namespace TavernTally
 {
     public class LogTail : IDisposable
     {

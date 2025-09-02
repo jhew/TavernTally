@@ -3,7 +3,7 @@ using System.Threading;
 using System.Windows.Forms;
 using Serilog;
 
-namespace TavernTally.App
+namespace TavernTally
 {
     // Note: This file contains legacy WinForms-based tray implementation
     // Current application uses WPF with TrayIcon.cs instead

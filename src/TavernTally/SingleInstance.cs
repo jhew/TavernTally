@@ -1,11 +1,11 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Windows.Forms;
 
-namespace TavernTally.App
+namespace TavernTally
 {
     internal static class SingleInstance
     {
@@ -18,8 +18,8 @@ namespace TavernTally.App
             {
                 var callId = Guid.NewGuid().ToString("N")[0..8]; // Unique identifier for this call
 
-                var eventName = $"TavernTally.App.Event.{Environment.UserName}";
-                var lockFilePath = Path.Combine(Path.GetTempPath(), $"TavernTally.App.{Environment.UserName}.lock");
+                var eventName = $"TavernTally.Event.{Environment.UserName}";
+                var lockFilePath = Path.Combine(Path.GetTempPath(), $"TavernTally.{Environment.UserName}.lock");
 
                 // Try to acquire the file lock first (most reliable method)
                 for (int attempt = 0; attempt < 3; attempt++)
@@ -61,7 +61,7 @@ namespace TavernTally.App
                                     try
                                     {
                                         var lockProcess = Process.GetProcessById(lockPid);
-                                        if (lockProcess.ProcessName != "TavernTally.App")
+                                        if (lockProcess.ProcessName != "TavernTally")
                                         {
                                             // PID exists but it's not TavernTally, lock file is stale
                                             File.Delete(lockFilePath);
@@ -129,7 +129,7 @@ namespace TavernTally.App
             // Also try to delete the lock file
             try
             {
-                var lockFilePath = Path.Combine(Path.GetTempPath(), $"TavernTally.App.{Environment.UserName}.lock");
+                var lockFilePath = Path.Combine(Path.GetTempPath(), $"TavernTally.{Environment.UserName}.lock");
                 if (File.Exists(lockFilePath))
                 {
                     File.Delete(lockFilePath);
@@ -142,8 +142,68 @@ namespace TavernTally.App
         {
             try
             {
+                // Check if this is a development restart request
+                var args = Environment.GetCommandLineArgs();
+                bool isDevRestart = args.Contains("--dev-restart") || 
+                                   File.Exists(Path.Combine(Path.GetTempPath(), "TavernTally.DevRestart.flag"));
+
+                if (isDevRestart)
+                {
+                    // Development mode: Kill existing instance and allow this one to start
+                    var result = MessageBox.Show(
+                        "Development restart detected. Kill existing instance and start new one?",
+                        "TavernTally Development", 
+                        MessageBoxButtons.YesNo, 
+                        MessageBoxIcon.Question);
+
+                    if (result == DialogResult.Yes)
+                    {
+                        KillExistingInstances();
+                        // Clean up the flag file
+                        try
+                        {
+                            File.Delete(Path.Combine(Path.GetTempPath(), "TavernTally.DevRestart.flag"));
+                        }
+                        catch { }
+                        return; // Allow this instance to continue
+                    }
+                }
+
                 MessageBox.Show("TavernTally is already running in the system tray.",
                     "TavernTally", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch { }
+        }
+
+        public static void KillExistingInstances()
+        {
+            try
+            {
+                var currentPid = Environment.ProcessId;
+                var processes = Process.GetProcessesByName("TavernTally");
+                
+                foreach (var process in processes)
+                {
+                    if (process.Id != currentPid) // Don't kill ourselves
+                    {
+                        try
+                        {
+                            process.Kill();
+                            process.WaitForExit(3000); // Wait up to 3 seconds
+                        }
+                        catch { }
+                    }
+                }
+            }
+            catch { }
+        }
+
+        public static void CreateDevRestartFlag()
+        {
+            try
+            {
+                var flagPath = Path.Combine(Path.GetTempPath(), "TavernTally.DevRestart.flag");
+                File.WriteAllText(flagPath, DateTime.Now.ToString());
             }
             catch { }
         }

@@ -1,0 +1,329 @@
+using System;
+using System.IO;
+using System.Linq;
+using System.Runtime.InteropServices;
+using System.Text;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Media;
+using Serilog;
+
+namespace TavernTally
+{
+    public partial class OverlayWindow : Window
+    {
+        private readonly Settings _settings = Settings.Load();
+        private readonly BgState _state = new();
+        private readonly LogTail _tail = new();
+        private readonly ForegroundWatcher _fg = new();
+        private HotkeyManager? _hotkeys;
+        private TrayIcon? _tray;
+        private readonly WindowTracker _tracker = new();
+        private bool _isInitialized = false;
+        private double _lastDetectedWidth = 0;
+        private double _lastDetectedHeight = 0;
+        private int _logLinesProcessed = 0;
+
+        public OverlayWindow()
+        {
+            InitializeComponent();
+            
+            this.Visibility = Visibility.Hidden;
+            
+            SourceInitialized += (_, __) => MakeClickThrough();
+            Loaded += OnLoaded;
+            Closed += (_, __) =>
+            {
+                _hotkeys?.Dispose();
+                _fg.Dispose();
+                _tail.Dispose();
+                _tray?.Dispose();
+                _tracker.Dispose();
+            };
+        }
+
+        private void OnLoaded(object? sender, RoutedEventArgs e)
+        {
+            if (_isInitialized)
+            {
+                return;
+            }
+            _isInitialized = true;
+
+            try
+            {
+                _tracker.OnClientRectChanged += r =>
+                {
+                    Dispatcher.Invoke(() =>
+                    {
+                        _lastDetectedWidth = r.Width;
+                        _lastDetectedHeight = r.Height;
+                        
+                        Log.Information($"[WINDOW DETECTION] Hearthstone window: X={r.X}, Y={r.Y}, Width={r.Width}, Height={r.Height}");
+                        
+                        // Skip positioning in debug mode to prevent override
+                        if (_settings.DebugAlwaysShowOverlay)
+                        {
+                            Log.Information("DEBUG: Skipping window tracker positioning due to debug mode");
+                            RenderHud();
+                            return;
+                        }
+                        
+                        if (r.Width <= 0 || r.Height <= 0 || r.X < -10000 || r.Y < -10000)
+                        {
+                            Left = 100;
+                            Top = 100; 
+                            Width = 800;
+                            Height = 600;
+                            Log.Warning("Hearthstone window not detected properly, forcing overlay to visible position");
+                        }
+                        else
+                        {
+                            Left = r.X + _settings.OffsetX;
+                            Top = r.Y + _settings.OffsetY;
+                            Width = r.Width;
+                            Height = r.Height;
+                            
+                            Log.Information($"[OVERLAY POSITIONED] Using full detected dimensions: Left={Left}, Top={Top}, Width={Width}, Height={Height}");
+                        }
+                        
+                        RenderHud();
+                    });
+                };
+                _tracker.Start();
+
+                _hotkeys = new HotkeyManager(this);
+                _hotkeys.ToggleOverlay += () => { 
+                    _settings.ShowOverlay = !_settings.ShowOverlay; 
+                    _settings.Save(); 
+                    Log.Information($"Overlay toggled: {_settings.ShowOverlay}");
+                    UpdateOverlayVisibility();
+                };
+                _hotkeys.IncreaseScale += () => { _settings.UiScale = Math.Min(2.0, _settings.UiScale + 0.05); _settings.Save(); };
+                _hotkeys.DecreaseScale += () => { _settings.UiScale = Math.Max(0.5, _settings.UiScale - 0.05); _settings.Save(); };
+                _hotkeys.ToggleManualBattlegrounds += () => { 
+                    _settings.ManualBattlegroundsMode = !_settings.ManualBattlegroundsMode; 
+                    _settings.Save(); 
+                    Log.Information($"Manual Battlegrounds mode: {_settings.ManualBattlegroundsMode}");
+                    UpdateOverlayVisibility();
+                };
+                _hotkeys.ResetBattlegrounds += () => {
+                    _state.Reset();
+                    Log.Information("Battlegrounds state reset");
+                    UpdateOverlayVisibility();
+                };
+                
+                // Register the hotkeys
+                _hotkeys.Register();
+                Log.Information("Hotkeys registered: F8=Toggle, Ctrl+F8=Manual BG, Ctrl+F9=Reset");
+
+                var parser = LogParser.Apply;
+
+                _fg.OnChange += visible =>
+                {
+                    Dispatcher.Invoke(() =>
+                    {
+                        Log.Information($"Foreground changed: {visible}");
+                        UpdateOverlayVisibility();
+                    });
+                };
+
+                _tail.OnLine += line =>
+                {
+                    _logLinesProcessed++;
+                    LogParser.Apply(line, _state);
+                    
+                    Dispatcher.Invoke(() =>
+                    {
+                        UpdateOverlayVisibility();
+                    });
+                };
+
+                var logPath = HearthstoneLogFinder.FindPowerLog();
+                if (!string.IsNullOrEmpty(logPath))
+                {
+                    Log.Information($"Starting log tail on: {logPath}");
+                    _tail.Start(logPath);
+                }
+                else
+                {
+                    Log.Error("Could not find Hearthstone log file");
+                }
+
+                _tray = new TrayIcon(_settings.ShowOverlay);
+                
+                // Initial visibility update
+                UpdateOverlayVisibility();
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Error during overlay initialization");
+            }
+        }
+
+        private void UpdateOverlayVisibility()
+        {
+            bool shouldShow = _settings.ShowOverlay && 
+                              (_fg.HearthstoneIsForeground || _settings.ManualBattlegroundsMode) && 
+                              (_state.InBattlegrounds || _settings.ManualBattlegroundsMode);
+
+            if (shouldShow)
+            {
+                Visibility = Visibility.Visible;
+                RenderHud();
+                Log.Information("Overlay made visible");
+            }
+            else
+            {
+                Visibility = Visibility.Hidden;
+                Log.Information($"Overlay hidden - ShowOverlay: {_settings.ShowOverlay}, HearthstoneIsForeground: {_fg.HearthstoneIsForeground}, InBattlegrounds: {_state.InBattlegrounds}, ManualMode: {_settings.ManualBattlegroundsMode}");
+            }
+        }
+
+        private void RenderHud()
+        {
+            HudCanvas.Children.Clear();
+            
+            if (!_settings.ShowOverlay)
+                return;
+
+            // Show minimal debug info if debug mode is enabled (but not the big debug block)
+            if (_settings.DebugAlwaysShowOverlay)
+            {
+                var debugText = new TextBlock
+                {
+                    Text = $"TT Debug | BG: {_state.InBattlegrounds} | Shop: {_state.ShopCount} Board: {_state.BoardCount} Hand: {_state.HandCount}",
+                    FontSize = 12,
+                    Foreground = System.Windows.Media.Brushes.Yellow,
+                    Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(128, 0, 0, 0)),
+                    Padding = new Thickness(3),
+                    IsHitTestVisible = false
+                };
+                
+                Canvas.SetLeft(debugText, 10);
+                Canvas.SetTop(debugText, 10);
+                HudCanvas.Children.Add(debugText);
+            }
+
+            // Only show labels when actually in Battlegrounds
+            if (!(_state.InBattlegrounds || _settings.ManualBattlegroundsMode))
+                return;
+
+            if (_state.ShouldAutoReset())
+            {
+                _state.Reset();
+                return;
+            }
+
+            // Shop labels (1, 2, 3, ...)
+            var effectiveShop = Math.Max(1, _state.ShopCount);
+            var shop = ShopAnchors(effectiveShop);
+            for (int i = 0; i < shop.Length; i++)
+                AddLabel((i + 1).ToString(), shop[i].X, shop[i].Y);
+
+            // Board labels (A, B, C, ... or 1, 2, 3, ... - let's use numbers for now)
+            var effectiveBoard = Math.Max(1, _state.BoardCount);
+            var board = BoardAnchors(effectiveBoard);
+            for (int i = 0; i < board.Length; i++)
+                AddLabel((i + 1).ToString(), board[i].X, board[i].Y);
+
+            // Hand labels (1, 2, 3, ...)
+            var effectiveHand = Math.Max(1, _state.HandCount);
+            var hand = HandAnchors(effectiveHand);
+            for (int i = 0; i < hand.Length; i++)
+                AddLabel((i + 1).ToString(), hand[i].X, hand[i].Y);
+        }
+
+        private void AddLabel(string text, double x, double y)
+        {
+            var tb = new TextBlock
+            {
+                Text = text,
+                FontSize = 28 * _settings.UiScale,
+                Foreground = System.Windows.Media.Brushes.White,
+                Effect = new System.Windows.Media.Effects.DropShadowEffect
+                {
+                    Color = Colors.Black, 
+                    Opacity = 0.85, 
+                    BlurRadius = 6, 
+                    ShadowDepth = 0
+                },
+                IsHitTestVisible = false
+            };
+            Canvas.SetLeft(tb, x);
+            Canvas.SetTop(tb, y);
+            HudCanvas.Children.Add(tb);
+        }
+
+        private void MakeClickThrough()
+        {
+            var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+            int exStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
+            SetWindowLong(hwnd, GWL_EXSTYLE, exStyle | WS_EX_TRANSPARENT | WS_EX_LAYERED);
+        }
+
+        private void MakeClickable()
+        {
+            var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+            int exStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
+            SetWindowLong(hwnd, GWL_EXSTYLE, exStyle & ~WS_EX_TRANSPARENT | WS_EX_LAYERED);
+        }
+
+        private const int GWL_EXSTYLE = -20;
+        private const int WS_EX_TRANSPARENT = 0x20;
+        private const int WS_EX_LAYERED = 0x80000;
+        
+        [DllImport("user32.dll")]
+        private static extern int GetWindowLong(IntPtr hWnd, int nIndex);
+        
+        [DllImport("user32.dll")]
+        private static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
+
+        // Anchor positions for shop cards
+        private (double X, double Y)[] ShopAnchors(int count)
+        {
+            var positions = new (double X, double Y)[count];
+            var baseY = Height * 0.66;
+            var startX = Width * 0.36;
+            var spacing = Width * 0.048;
+            
+            for (int i = 0; i < count; i++)
+            {
+                positions[i] = (startX + i * spacing, baseY);
+            }
+            return positions;
+        }
+
+        // Anchor positions for board cards
+        private (double X, double Y)[] BoardAnchors(int count)
+        {
+            var positions = new (double X, double Y)[count];
+            var baseY = Height * 0.40;
+            var startX = Width * 0.36;
+            var spacing = Width * 0.055;
+            
+            for (int i = 0; i < count; i++)
+            {
+                positions[i] = (startX + i * spacing, baseY);
+            }
+            return positions;
+        }
+
+        // Anchor positions for hand cards
+        private (double X, double Y)[] HandAnchors(int count)
+        {
+            var positions = new (double X, double Y)[count];
+            var baseY = Height * 0.90;
+            var centerX = Width * 0.5;
+            var totalWidth = (count - 1) * Width * 0.06;
+            var startX = centerX - totalWidth / 2;
+            var spacing = Width * 0.06;
+            
+            for (int i = 0; i < count; i++)
+            {
+                positions[i] = (startX + i * spacing, baseY);
+            }
+            return positions;
+        }
+    }
+}

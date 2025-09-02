@@ -4,7 +4,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Forms;
 
-namespace TavernTally.App
+namespace TavernTally
 {
     /// <summary>
     /// UI-only wrapper around NotifyIcon. Raises events for the host app to handle.

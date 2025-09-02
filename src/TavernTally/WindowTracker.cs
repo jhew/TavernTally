@@ -4,7 +4,7 @@ using System.Runtime.InteropServices;
 using System.Timers;
 using System.Windows;
 
-namespace TavernTally.App
+namespace TavernTally
 {
     /// <summary>
     /// Tracks Hearthstone's client rectangle in screen coordinates

@@ -6,7 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Media.Imaging;
 using Serilog;
 
-namespace TavernTally.App
+namespace TavernTally
 {
     public partial class CalibrationWindow : Window
     {
