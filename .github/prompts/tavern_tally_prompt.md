@@ -93,7 +93,7 @@ TavernTally is a safe, click‑through overlay for **Hearthstone Battlegrounds**
   - `F8` — toggle overlay
   - `Ctrl+=` / `Ctrl+-` — scale labels
   - (optional) `F10` — toggle debug badge
-- **Tray menu:** Toggle Overlay, Align Overlay (nudge), Open Settings, Check Updates, Exit.
+- **Tray menu:** Show Overlay, Align Overlay (nudge), Open Settings, Hotkeys, Check Updates, Exit.
 - **Debug badge:** shows BG/FG state & counts; auto‑hidden in Streamer Mode.
 - **Accessibility:**
   - Presets for light/dark/high‑contrast; color‑blind‑safe hues.
