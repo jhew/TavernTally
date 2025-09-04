@@ -126,13 +126,26 @@ namespace TavernTally
             }
             catch { }
 
-            // Also try to delete the lock file
+            // More aggressive lock file cleanup
             try
             {
                 var lockFilePath = Path.Combine(Path.GetTempPath(), $"TavernTally.{Environment.UserName}.lock");
                 if (File.Exists(lockFilePath))
                 {
+                    // Force delete even if locked (this can happen if process crashed)
+                    File.SetAttributes(lockFilePath, FileAttributes.Normal);
                     File.Delete(lockFilePath);
+                }
+            }
+            catch { }
+            
+            // Also clean up any potential dev restart flags
+            try
+            {
+                var flagPath = Path.Combine(Path.GetTempPath(), "TavernTally.DevRestart.flag");
+                if (File.Exists(flagPath))
+                {
+                    File.Delete(flagPath);
                 }
             }
             catch { }

@@ -12,6 +12,12 @@ namespace TavernTally
         static readonly Regex ReBattlegroundsCard = new(@"cardId=BG\d+_", RegexOptions.Compiled | RegexOptions.IgnoreCase);
         static readonly Regex ReBattlegroundsGameType = new(@"GT_BATTLEGROUNDS", RegexOptions.Compiled | RegexOptions.IgnoreCase);
         
+        // Phase detection patterns based on Hearthstone log structure
+        static readonly Regex ReGameStart = new(@"GameState\.Start\(\)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        static readonly Regex ReTurnStart = new(@"BLOCK_START.*ACTION_PHASE", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        static readonly Regex ReEndTurn = new(@"BLOCK_START.*SUB_ACTION_END_TURN", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        static readonly Regex ReRecruitActions = new(@"BUY|REFRESH|GOLD_LOCKED|ROLL", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        
         // Dynamic card counting patterns
         static readonly Regex ReZoneChange = new(@"TAG_CHANGE Entity=\[.*id=(\d+).*\] tag=ZONE value=(\w+)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
         static readonly Regex ReFullEntity = new(@"FULL_ENTITY.*id=(\d+).*zone=(\w+)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
@@ -69,7 +75,81 @@ namespace TavernTally
                 // Only process if we're in Battlegrounds
                 if (!s.InBattlegrounds)
                     return;
-                
+
+                // Detect phase transitions within Battlegrounds
+                // Priority 1: Combat phase detection (highest priority)
+                if (ReEndTurn.IsMatch(line) && s.InRecruitPhase)
+                {
+                    Log.Information("⚔️ COMBAT PHASE DETECTED - Player ended turn (END_TURN)");
+                    s.SetRecruitPhase(false);
+                    return;
+                }
+
+                // Priority 2: Opponent's turn starting (while we're in recruit phase)
+                if (ReTurnStart.IsMatch(line) && s.InRecruitPhase && line.Contains("opponent") || line.Contains("OPPONENT"))
+                {
+                    Log.Information("⚔️ COMBAT PHASE DETECTED - Opponent's turn started while in recruit phase");
+                    s.SetRecruitPhase(false);
+                    return;
+                }
+
+                // Priority 3: Recruit phase detection via shop actions
+                if (ReRecruitActions.IsMatch(line) && !s.InRecruitPhase)
+                {
+                    Log.Information("🛒 RECRUIT PHASE DETECTED - Shop action: {Action}",
+                        ReRecruitActions.Match(line).Value);
+                    s.SetRecruitPhase(true);
+                    return;
+                }
+
+                // Priority 4: New turn/round start (our turn again) - only if we're not already in recruit phase
+                if (ReTurnStart.IsMatch(line) && !s.InRecruitPhase && !line.Contains("opponent") && !line.Contains("OPPONENT"))
+                {
+                    Log.Information("🆕 NEW TURN DETECTED - Our turn started, back to recruit phase");
+                    s.SetRecruitPhase(true);
+                    return;
+                }
+
+                // Fallback: If we detect TurnStart but can't determine context, log it for debugging
+                if (ReTurnStart.IsMatch(line))
+                {
+                    Log.Debug("🔄 TurnStart detected but conditions not met - Current state: Recruit={Recruit}, BG={BG}",
+                        s.InRecruitPhase, s.InBattlegrounds);
+                }
+
+                // Error recovery: If we've been in the same phase for too long, log a warning
+                var timeInCurrentPhase = DateTime.Now - s.LastStateChange;
+                if (timeInCurrentPhase.TotalMinutes > 5) // 5 minutes is unusually long for a phase
+                {
+                    Log.Warning("⚠️ PHASE STUCK WARNING - Been in {Phase} phase for {Minutes:F1} minutes. This may indicate detection issues.",
+                        s.InRecruitPhase ? "recruit" : "combat", timeInCurrentPhase.TotalMinutes);
+
+                    // Auto-recovery: If stuck for more than 10 minutes, reset to recruit phase
+                    if (timeInCurrentPhase.TotalMinutes > 10)
+                    {
+                        Log.Warning("🚨 PHASE AUTO-RECOVERY - Resetting to recruit phase after {Minutes:F1} minutes of inactivity",
+                            timeInCurrentPhase.TotalMinutes);
+                        s.SetRecruitPhase(true);
+                    }
+                }
+
+                // Bounds checking: Ensure counts are reasonable
+                if (s.ShopCount < 0 || s.ShopCount > 10)
+                {
+                    Log.Warning("⚠️ INVALID SHOP COUNT: {Count} - Resetting to 0", s.ShopCount);
+                    s.SetShop(0);
+                }
+                if (s.HandCount < 0 || s.HandCount > 10)
+                {
+                    Log.Warning("⚠️ INVALID HAND COUNT: {Count} - Resetting to 0", s.HandCount);
+                    s.SetHand(0);
+                }
+                if (s.BoardCount < 0 || s.BoardCount > 7)
+                {
+                    Log.Warning("⚠️ INVALID BOARD COUNT: {Count} - Resetting to 0", s.BoardCount);
+                    s.SetBoard(0);
+                }
+
                 // DEBUG: Log interesting lines to understand the format
                 if (line.Contains("TAG_CHANGE") && (line.Contains("ZONE") || line.Contains("zone=")))
                 {

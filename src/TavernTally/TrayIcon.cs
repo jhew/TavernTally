@@ -17,6 +17,7 @@ namespace TavernTally
         private readonly ToolStripMenuItem _toggleOverlayItem;
         private readonly ToolStripMenuItem _calibrateItem;
         private readonly ToolStripMenuItem _settingsItem;
+        private readonly ToolStripMenuItem _hotkeysItem;
         private readonly ToolStripMenuItem _aboutItem;
         private readonly ToolStripMenuItem _exitItem;
 
@@ -35,9 +36,10 @@ namespace TavernTally
             _menu = new ContextMenuStrip();
 
             _openItem = new ToolStripMenuItem("Open", null, (_, __) => OpenRequested?.Invoke(this, EventArgs.Empty));
-            _toggleOverlayItem = new ToolStripMenuItem("Enable Overlay", null, OnToggleOverlayClick) { CheckOnClick = false };
+            _toggleOverlayItem = new ToolStripMenuItem("Show Overlay", null, OnToggleOverlayClick) { CheckOnClick = false };
             _calibrateItem = new ToolStripMenuItem("🎯 Calibrate Overlay…", null, (_, __) => CalibrateRequested?.Invoke(this, EventArgs.Empty));
             _settingsItem = new ToolStripMenuItem("Settings…", null, (_, __) => SettingsRequested?.Invoke(this, EventArgs.Empty));
+            _hotkeysItem = new ToolStripMenuItem("⌨️ Hotkeys…", null, OnHotkeysClick);
             _aboutItem = new ToolStripMenuItem("About TavernTally", null, OnAboutClick);
             _exitItem = new ToolStripMenuItem("Exit", null, (_, __) => ExitRequested?.Invoke(this, EventArgs.Empty));
 
@@ -49,6 +51,7 @@ namespace TavernTally
                 _calibrateItem,
                 _settingsItem,
                 new ToolStripSeparator(),
+                _hotkeysItem,
                 _aboutItem,
                 _exitItem
             });
@@ -95,7 +98,7 @@ namespace TavernTally
         private void UpdateOverlayMenuVisual()
         {
             _toggleOverlayItem.Checked = _overlayEnabled;
-            _toggleOverlayItem.Text = _overlayEnabled ? "Disable Overlay" : "Enable Overlay";
+            // Text stays as "Show Overlay" - checkmark indicates current state
         }
 
         private void OnAboutClick(object? sender, EventArgs e)
@@ -104,6 +107,22 @@ namespace TavernTally
             var aboutMessage = $"TavernTally\nHearthstone Companion Application\n\nVersion: {version}\n\nDeveloped for enhanced Hearthstone gameplay experience.";
             
             System.Windows.MessageBox.Show(aboutMessage, "About TavernTally", 
+                System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+        }
+
+        private void OnHotkeysClick(object? sender, EventArgs e)
+        {
+            var hotkeysMessage = "TavernTally Keyboard Shortcuts:\n\n" +
+                "• F8 - Toggle overlay visibility\n" +
+                "• Ctrl + = - Increase label size\n" +
+                "• Ctrl + - - Decrease label size\n" +
+                "• Ctrl + F8 - Toggle manual Battlegrounds mode\n" +
+                "• Ctrl + Shift + = - Increase shop count\n" +
+                "• Ctrl + Shift + - - Decrease shop count\n" +
+                "• Ctrl + F9 - Reset Battlegrounds detection\n\n" +
+                "Tip: Hotkeys only work when Hearthstone is the active window.";
+
+            System.Windows.MessageBox.Show(hotkeysMessage, "TavernTally Hotkeys", 
                 System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
         }
 

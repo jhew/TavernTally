@@ -55,6 +55,17 @@ namespace TavernTally
             set => _handYPct = Math.Clamp(value, 0.0, 1.0); 
         }
 
+        // Hotkey configuration (for future extensibility)
+        public string HotkeyToggleOverlay { get; set; } = "F8";
+        public string HotkeyIncreaseScale { get; set; } = "Ctrl+=";
+        public string HotkeyDecreaseScale { get; set; } = "Ctrl+-";
+        public string HotkeyManualBattlegrounds { get; set; } = "Ctrl+F8";
+
+        // Future hotkeys can be added here
+        // public string HotkeyResetBattlegrounds { get; set; } = "Ctrl+F9";
+        // public string HotkeyIncreaseShopCount { get; set; } = "Ctrl+Shift+=";
+        // public string HotkeyDecreaseShopCount { get; set; } = "Ctrl+Shift+-";
+
         // Optional update feed (leave null/empty to disable network)
         public string? UpdateJsonUrl { get; set; } = null;
         public bool AllowUpdateChecks => !string.IsNullOrWhiteSpace(UpdateJsonUrl);
