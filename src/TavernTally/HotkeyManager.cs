@@ -14,7 +14,6 @@ namespace TavernTally
         public event Action? ToggleOverlay;
         public event Action? IncreaseScale;
         public event Action? DecreaseScale;
-        public event Action? ToggleManualBattlegrounds;
         public event Action? IncreaseShopCount;
         public event Action? DecreaseShopCount;
         public event Action? ResetBattlegrounds;
@@ -32,14 +31,12 @@ namespace TavernTally
             RegisterHotKey(_source.Handle, 2, MOD_CONTROL, 0xBB);
             // Ctrl+-
             RegisterHotKey(_source.Handle, 3, MOD_CONTROL, 0xBD);
-            // Ctrl+F8 (Manual Battlegrounds toggle)
-            RegisterHotKey(_source.Handle, 4, MOD_CONTROL, 0x77);
             // Ctrl+Shift+= (Increase shop count)
-            RegisterHotKey(_source.Handle, 5, MOD_CONTROL | MOD_SHIFT, 0xBB);
+            RegisterHotKey(_source.Handle, 4, MOD_CONTROL | MOD_SHIFT, 0xBB);
             // Ctrl+Shift+- (Decrease shop count)  
-            RegisterHotKey(_source.Handle, 6, MOD_CONTROL | MOD_SHIFT, 0xBD);
+            RegisterHotKey(_source.Handle, 5, MOD_CONTROL | MOD_SHIFT, 0xBD);
             // Ctrl+F9 (Reset Battlegrounds detection)
-            RegisterHotKey(_source.Handle, 7, MOD_CONTROL, 0x78);
+            RegisterHotKey(_source.Handle, 6, MOD_CONTROL, 0x78);
         }
 
         public void Unregister()
@@ -64,10 +61,9 @@ namespace TavernTally
                 if (id == 1) ToggleOverlay?.Invoke();
                 else if (id == 2) IncreaseScale?.Invoke();
                 else if (id == 3) DecreaseScale?.Invoke();
-                else if (id == 4) ToggleManualBattlegrounds?.Invoke();
-                else if (id == 5) IncreaseShopCount?.Invoke();
-                else if (id == 6) DecreaseShopCount?.Invoke();
-                else if (id == 7) ResetBattlegrounds?.Invoke();
+                else if (id == 4) IncreaseShopCount?.Invoke();
+                else if (id == 5) DecreaseShopCount?.Invoke();
+                else if (id == 6) ResetBattlegrounds?.Invoke();
                 handled = true;
             }
             return IntPtr.Zero;

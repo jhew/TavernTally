@@ -154,6 +154,25 @@ namespace TavernTally
                    TurnNumber >= 0;
         }
         
+        /// <summary>
+        /// Detect if we're already in a Battlegrounds match based on current state
+        /// Used during initial log parsing to handle mid-match startup
+        /// </summary>
+        public bool DetectInitialBattlegroundsState(int bgCardCount)
+        {
+            // Lower threshold for initial detection - be more aggressive
+            if (bgCardCount >= 2)
+            {
+                Log.Information("🎯 INITIAL BATTLEGROUNDS DETECTED - {Count} BG cards found, activating overlay", bgCardCount);
+                SetMode(true);
+                SetRecruitPhase(true); // Assume recruit phase initially
+                UpdateBattlegroundsActivity();
+                Log.Information("✅ Battlegrounds mode activated - Overlay should now display");
+                return true;
+            }
+            return false;
+        }
+        
         public override string ToString()
         {
             return $"BG:{InBattlegrounds} Hand:{HandCount} Board:{BoardCount} Shop:{ShopCount} " +

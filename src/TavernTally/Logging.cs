@@ -21,14 +21,14 @@ namespace TavernTally
                 var logFile = Path.Combine(logDir, "taverntally.log");
 
                 Log.Logger = new LoggerConfiguration()
-                    .MinimumLevel.Debug()
+                    .MinimumLevel.Information()  // Changed from Debug to Information for better performance
                     .WriteTo.Async(a => a.File(
                         logFile,
                         rollingInterval: RollingInterval.Day,
                         retainedFileCountLimit: 7,
-                        outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] {Message:lj}{NewLine}{Exception}",
+                        outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss} [{Level:u3}] {Message:lj}{NewLine}{Exception}", // Removed milliseconds for better performance
                         buffered: true,
-                        flushToDiskInterval: TimeSpan.FromSeconds(10)
+                        flushToDiskInterval: TimeSpan.FromSeconds(5)  // Reduced from 10s to 5s for more responsive logging
                     ))
                     .CreateLogger();
 

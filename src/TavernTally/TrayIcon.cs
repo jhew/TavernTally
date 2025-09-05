@@ -13,7 +13,6 @@ namespace TavernTally
     {
         private readonly NotifyIcon? _notifyIcon;
         private readonly ContextMenuStrip _menu;
-        private readonly ToolStripMenuItem _openItem;
         private readonly ToolStripMenuItem _toggleOverlayItem;
         private readonly ToolStripMenuItem _calibrateItem;
         private readonly ToolStripMenuItem _settingsItem;
@@ -22,7 +21,6 @@ namespace TavernTally
 
         private bool _overlayEnabled;
 
-        public event EventHandler? OpenRequested;
         public event EventHandler<bool>? OverlayToggleRequested;
         public event EventHandler? CalibrateRequested;
         public event EventHandler? SettingsRequested;
@@ -34,17 +32,16 @@ namespace TavernTally
 
             _menu = new ContextMenuStrip();
 
-            _openItem = new ToolStripMenuItem("Open", null, (_, __) => OpenRequested?.Invoke(this, EventArgs.Empty));
-            _toggleOverlayItem = new ToolStripMenuItem("Enable Overlay", null, OnToggleOverlayClick) { CheckOnClick = false };
-            _calibrateItem = new ToolStripMenuItem("🎯 Calibrate Overlay…", null, (_, __) => CalibrateRequested?.Invoke(this, EventArgs.Empty));
+            _toggleOverlayItem = new ToolStripMenuItem(
+                overlayInitiallyEnabled ? "Disable Overlay" : "Enable Overlay", 
+                null, OnToggleOverlayClick) { CheckOnClick = false };
+            _calibrateItem = new ToolStripMenuItem("Calibrate Overlay…", null, (_, __) => CalibrateRequested?.Invoke(this, EventArgs.Empty));
             _settingsItem = new ToolStripMenuItem("Settings…", null, (_, __) => SettingsRequested?.Invoke(this, EventArgs.Empty));
             _aboutItem = new ToolStripMenuItem("About TavernTally", null, OnAboutClick);
             _exitItem = new ToolStripMenuItem("Exit", null, (_, __) => ExitRequested?.Invoke(this, EventArgs.Empty));
 
             _menu.Items.AddRange(new ToolStripItem[]
             {
-                _openItem,
-                new ToolStripSeparator(),
                 _toggleOverlayItem,
                 _calibrateItem,
                 _settingsItem,
@@ -62,8 +59,6 @@ namespace TavernTally
                     Visible = true,
                     ContextMenuStrip = _menu
                 };
-
-                _notifyIcon.DoubleClick += (_, __) => OpenRequested?.Invoke(this, EventArgs.Empty);
 
                 UpdateOverlayMenuVisual();
                 
@@ -94,7 +89,7 @@ namespace TavernTally
 
         private void UpdateOverlayMenuVisual()
         {
-            _toggleOverlayItem.Checked = _overlayEnabled;
+            _toggleOverlayItem.Checked = false; // Always remove checkmark for cleaner UX
             _toggleOverlayItem.Text = _overlayEnabled ? "Disable Overlay" : "Enable Overlay";
         }
 

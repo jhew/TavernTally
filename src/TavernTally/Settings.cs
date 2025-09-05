@@ -22,8 +22,10 @@ namespace TavernTally
 
         public bool DebugAlwaysShowOverlay { get; set; } = false; // only show overlay when appropriate conditions are met
         
-        // Manual Battlegrounds mode toggle - for when log detection fails
-        public bool ManualBattlegroundsMode { get; set; } = false;
+
+        
+        // Bypass foreground detection - for when Hearthstone foreground detection fails
+        public bool BypassForegroundCheck { get; set; } = false;
 
         public double UiScale 
         { 

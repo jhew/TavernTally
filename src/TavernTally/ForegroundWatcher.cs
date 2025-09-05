@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Timers;
+using Serilog;
 
 namespace TavernTally
 {
@@ -25,12 +26,18 @@ namespace TavernTally
             var h = GetForegroundWindow();
             GetWindowThreadProcessId(h, out uint pid);
             string procName = "";
-            try { procName = Process.GetProcessById((int)pid).ProcessName; } catch { }
-            bool isHs = !string.IsNullOrEmpty(procName) && procName.Equals("Hearthstone", StringComparison.OrdinalIgnoreCase);
+            try { 
+                procName = Process.GetProcessById((int)pid).ProcessName; 
+                Log.Debug($"Foreground process: {procName} (PID: {pid})");
+            } catch { }
+            bool isHs = !string.IsNullOrEmpty(procName) && 
+                       (procName.Equals("Hearthstone", StringComparison.OrdinalIgnoreCase) ||
+                        procName.Contains("Hearthstone", StringComparison.OrdinalIgnoreCase));
 
             if (isHs != HearthstoneIsForeground)
             {
                 HearthstoneIsForeground = isHs;
+                Log.Information($"Hearthstone foreground changed: {isHs} (process: {procName})");
                 OnChange?.Invoke(isHs);
             }
         }

@@ -1,2 +1,0 @@
-C:\Users\jehew\TavernTally\test-publish\TavernTally.App.pdb
-C:\Users\jehew\TavernTally\test-publish\TavernTally.App.exe

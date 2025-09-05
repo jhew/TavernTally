@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using Serilog;
 
 namespace TavernTally
 {
@@ -13,6 +14,7 @@ namespace TavernTally
         private long _pos;
 
         public event Action<string>? OnLine;
+        public event Action<string[]>? OnInitialDetectionComplete;
 
         public void Start(string file)
         {
@@ -69,12 +71,17 @@ namespace TavernTally
                     lines.Add(line);
                 }
                 
-                // Process the last 100 lines (or all if fewer)
-                var recentLines = lines.TakeLast(100);
+                // Process MORE lines for initial detection to catch BG cards that might be further back
+                var recentLines = lines.TakeLast(Math.Min(lines.Count, 500)); // Process up to 500 recent lines for better detection
+                Log.Debug("Processing {Count} recent lines for initial detection", recentLines.Count());
                 foreach (var recentLine in recentLines)
                 {
                     OnLine?.Invoke(recentLine);
                 }
+                
+                // Complete initial detection after processing recent lines
+                // This allows LogParser to check if we detected enough BG cards for initial state
+                OnInitialDetectionComplete?.Invoke(recentLines.ToArray());
             }
             catch (Exception ex)
             {

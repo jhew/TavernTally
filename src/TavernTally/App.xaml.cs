@@ -27,6 +27,8 @@ namespace TavernTally
             try
             {
                 var main = new OverlayWindow();
+                // Set this as the main window for proper application lifecycle management
+                System.Windows.Application.Current.MainWindow = main;
                 // Show the window to trigger Loaded event, then let it control its own visibility
                 main.Show();
             }
@@ -42,6 +44,7 @@ namespace TavernTally
 
         protected override void OnExit(ExitEventArgs e)
         {
+            Log.Information("App.OnExit called - application shutting down");
             try
             {
                 Log.Information("TavernTally application shutting down");
@@ -57,6 +60,7 @@ namespace TavernTally
             {
                 // Release the single instance resources
                 SingleInstance.Cleanup();
+                Log.Information("SingleInstance cleanup completed");
             }
             catch (Exception ex)
             {

@@ -34,7 +34,6 @@ namespace TavernTally
             _trayIcon = new TrayIcon(overlayInitiallyEnabled: _overlay.IsEnabled);
 
             // Wire tray events
-            _trayIcon.OpenRequested += (_, __) => ShowSettings(); // Reuse "Open" to show settings or main window
             _trayIcon.SettingsRequested += (_, __) => ShowSettings();
 
             _trayIcon.OverlayToggleRequested += (_, enabled) =>
@@ -57,7 +56,7 @@ namespace TavernTally
                 return;
             }
 
-            _settings = new SettingsForm(_overlay);
+            _settings = new SettingsForm(_overlay, new Settings());
             _settings.FormClosed += (_, __) => _settings = null;
             _settings.Show();
             _settings.Activate();
@@ -71,14 +70,6 @@ namespace TavernTally
             _trayIcon.Dispose();
             base.ExitThreadCore();
         }
-    }
-
-    /// <summary>Minimal interface so TrayIcon stays UI-only.</summary>
-    internal interface IOverlayController
-    {
-        bool IsEnabled { get; }
-        void Enable();
-        void Disable();
     }
 
     /// <summary>Stub implementation — replace with your real overlay logic.</summary>

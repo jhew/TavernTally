@@ -10,6 +10,14 @@ using Serilog;
 
 namespace TavernTally
 {
+    /// <summary>Minimal interface for overlay control.</summary>
+    internal interface IOverlayController
+    {
+        bool IsEnabled { get; }
+        void Enable();
+        void Disable();
+    }
+
     public partial class OverlayWindow : Window
     {
         private readonly Settings _settings = Settings.Load();
@@ -34,11 +42,13 @@ namespace TavernTally
             Loaded += OnLoaded;
             Closed += (_, __) =>
             {
+                Log.Information("OverlayWindow.Closed event triggered - cleaning up resources");
                 _hotkeys?.Dispose();
                 _fg.Dispose();
                 _tail.Dispose();
                 _tray?.Dispose();
                 _tracker.Dispose();
+                Log.Information("OverlayWindow cleanup completed");
             };
         }
 
@@ -101,12 +111,6 @@ namespace TavernTally
                 };
                 _hotkeys.IncreaseScale += () => { _settings.UiScale = Math.Min(2.0, _settings.UiScale + 0.05); _settings.Save(); };
                 _hotkeys.DecreaseScale += () => { _settings.UiScale = Math.Max(0.5, _settings.UiScale - 0.05); _settings.Save(); };
-                _hotkeys.ToggleManualBattlegrounds += () => { 
-                    _settings.ManualBattlegroundsMode = !_settings.ManualBattlegroundsMode; 
-                    _settings.Save(); 
-                    Log.Information($"Manual Battlegrounds mode: {_settings.ManualBattlegroundsMode}");
-                    UpdateOverlayVisibility();
-                };
                 _hotkeys.ResetBattlegrounds += () => {
                     _state.Reset();
                     Log.Information("Battlegrounds state reset");
@@ -115,7 +119,7 @@ namespace TavernTally
                 
                 // Register the hotkeys
                 _hotkeys.Register();
-                Log.Information("Hotkeys registered: F8=Toggle, Ctrl+F8=Manual BG, Ctrl+F9=Reset");
+                Log.Information("Hotkeys registered: F8=Toggle, Ctrl+F9=Reset");
 
                 var parser = LogParser.Apply;
 
@@ -139,6 +143,17 @@ namespace TavernTally
                     });
                 };
 
+                _tail.OnInitialDetectionComplete += (recentLines) =>
+                {
+                    LogParser.CompleteInitialDetection(_state);
+                    LogParser.ScanForShopContents(recentLines, _state);
+                    
+                    Dispatcher.Invoke(() =>
+                    {
+                        UpdateOverlayVisibility();
+                    });
+                };
+
                 var logPath = HearthstoneLogFinder.FindPowerLog();
                 if (!string.IsNullOrEmpty(logPath))
                 {
@@ -152,6 +167,47 @@ namespace TavernTally
 
                 _tray = new TrayIcon(_settings.ShowOverlay);
                 
+                // Wire up tray exit event to properly shut down the application
+                _tray.ExitRequested += (_, __) => 
+                {
+                    Log.Information("Exit requested from system tray");
+                    // Clean up single instance resources first
+                    SingleInstance.Cleanup();
+                    
+                    // Close the window first to ensure proper cleanup
+                    this.Close();
+                    
+                    // Give WPF a moment to process the window close
+                    System.Threading.Thread.Sleep(100);
+                    
+                    // Then shut down the application
+                    System.Windows.Application.Current.Shutdown();
+                    
+                    // As a fallback, force exit if WPF shutdown doesn't work
+                    System.Threading.Tasks.Task.Delay(500).ContinueWith(_ => 
+                    {
+                        Log.Warning("WPF shutdown didn't complete cleanly, forcing exit");
+                        Environment.Exit(0);
+                    });
+                };
+
+                // Handle tray overlay toggle requests
+                _tray.OverlayToggleRequested += (_, enabled) =>
+                {
+                    _settings.ShowOverlay = enabled;
+                    _settings.Save();
+                    _tray.SetOverlayEnabled(enabled);
+                    Log.Information($"Overlay toggled from tray: {_settings.ShowOverlay}");
+                    UpdateOverlayVisibility();
+                };
+
+                // Handle tray settings requests
+                _tray.SettingsRequested += (_, __) =>
+                {
+                    Log.Information("Settings requested from system tray");
+                    ShowSettingsForm();
+                };
+                
                 // Initial visibility update
                 UpdateOverlayVisibility();
             }
@@ -163,20 +219,78 @@ namespace TavernTally
 
         private void UpdateOverlayVisibility()
         {
-            bool shouldShow = _settings.ShowOverlay && 
-                              (_fg.HearthstoneIsForeground || _settings.ManualBattlegroundsMode) && 
-                              (_state.InBattlegrounds || _settings.ManualBattlegroundsMode);
+            bool showOverlay = _settings.ShowOverlay;
+            bool hearthstoneForeground = _fg.HearthstoneIsForeground || _settings.BypassForegroundCheck;
+            bool inBattlegrounds = _state.InBattlegrounds;
+            bool inRecruitPhase = _state.InRecruitPhase;
+            
+            // For coaching/streaming: Show overlay when Hearthstone is detected (not just foreground)
+            // This allows overlay to display even when using Discord, VS Code, browser, etc.
+            bool condition1 = showOverlay;
+            bool condition2 = true; // Always true for coaching/streaming use case
+            bool condition3 = inBattlegrounds;
+            bool condition4 = inRecruitPhase;
+            
+            bool shouldShow = condition1 && condition2 && condition3 && condition4;
 
             if (shouldShow)
             {
                 Visibility = Visibility.Visible;
                 RenderHud();
-                Log.Information("Overlay made visible");
+                Log.Information("✅ Overlay made visible - All conditions met");
             }
             else
             {
                 Visibility = Visibility.Hidden;
-                Log.Information($"Overlay hidden - ShowOverlay: {_settings.ShowOverlay}, HearthstoneIsForeground: {_fg.HearthstoneIsForeground}, InBattlegrounds: {_state.InBattlegrounds}, ManualMode: {_settings.ManualBattlegroundsMode}");
+                Log.Information($"❌ Overlay hidden - Failed conditions: ShowOverlay:{condition1}, Foreground:{condition2}, Battlegrounds:{condition3}, RecruitPhase:{condition4}");
+            }
+        }
+
+        private void ShowSettingsForm()
+        {
+            try
+            {
+                // Create a simple overlay controller for the settings form
+                var overlayController = new SimpleOverlayController(_settings, UpdateOverlayVisibility);
+                var settingsForm = new SettingsForm(overlayController, _settings);
+                settingsForm.ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Error showing settings form");
+                System.Windows.MessageBox.Show($"Error opening settings: {ex.Message}", "TavernTally Error",
+                    System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+            }
+        }
+
+        /// <summary>
+        /// Simple overlay controller that works with the current Settings system
+        /// </summary>
+        private class SimpleOverlayController : IOverlayController
+        {
+            private readonly Settings _settings;
+            private readonly Action _updateOverlayVisibility;
+
+            public SimpleOverlayController(Settings settings, Action updateOverlayVisibility)
+            {
+                _settings = settings;
+                _updateOverlayVisibility = updateOverlayVisibility;
+            }
+
+            public bool IsEnabled => _settings.ShowOverlay;
+
+            public void Enable()
+            {
+                _settings.ShowOverlay = true;
+                _settings.Save();
+                _updateOverlayVisibility();
+            }
+
+            public void Disable()
+            {
+                _settings.ShowOverlay = false;
+                _settings.Save();
+                _updateOverlayVisibility();
             }
         }
 
@@ -192,7 +306,7 @@ namespace TavernTally
             {
                 var debugText = new TextBlock
                 {
-                    Text = $"TT Debug | BG: {_state.InBattlegrounds} | Shop: {_state.ShopCount} Board: {_state.BoardCount} Hand: {_state.HandCount}",
+                    Text = $"TT Debug | BG: {_state.InBattlegrounds} | Recruit: {_state.InRecruitPhase} | Shop: {_state.ShopCount} Board: {_state.BoardCount} Hand: {_state.HandCount}",
                     FontSize = 12,
                     Foreground = System.Windows.Media.Brushes.Yellow,
                     Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(128, 0, 0, 0)),
@@ -206,7 +320,7 @@ namespace TavernTally
             }
 
             // Only show labels when actually in Battlegrounds
-            if (!(_state.InBattlegrounds || _settings.ManualBattlegroundsMode))
+            if (!_state.InBattlegrounds)
                 return;
 
             if (_state.ShouldAutoReset())
@@ -215,6 +329,7 @@ namespace TavernTally
                 return;
             }
 
+            // Show minion count labels (overlay only appears during recruit phase)
             // Shop labels (1, 2, 3, ...)
             var effectiveShop = Math.Max(1, _state.ShopCount);
             var shop = ShopAnchors(effectiveShop);
