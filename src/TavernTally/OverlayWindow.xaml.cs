@@ -106,6 +106,7 @@ namespace TavernTally
                 _hotkeys.ToggleOverlay += () => { 
                     _settings.ShowOverlay = !_settings.ShowOverlay; 
                     _settings.Save(); 
+                    _tray?.SetOverlayEnabled(_settings.ShowOverlay);
                     Log.Information($"Overlay toggled: {_settings.ShowOverlay}");
                     UpdateOverlayVisibility();
                 };
@@ -291,6 +292,7 @@ namespace TavernTally
                 _settings.ShowOverlay = false;
                 _settings.Save();
                 _updateOverlayVisibility();
+                Log.Information($"Overlay hidden - ShowOverlay: {_settings.ShowOverlay}, HearthstoneIsForeground: {_fg.HearthstoneIsForeground}, InBattlegrounds: {_state.InBattlegrounds}, InRecruitPhase: {_state.InRecruitPhase}, ManualMode: {_settings.ManualBattlegroundsMode}");
             }
         }
 
@@ -329,24 +331,28 @@ namespace TavernTally
                 return;
             }
 
-            // Show minion count labels (overlay only appears during recruit phase)
-            // Shop labels (1, 2, 3, ...)
-            var effectiveShop = Math.Max(1, _state.ShopCount);
-            var shop = ShopAnchors(effectiveShop);
-            for (int i = 0; i < shop.Length; i++)
-                AddLabel((i + 1).ToString(), shop[i].X, shop[i].Y);
+            // Only show minion count labels during the recruit phase
+            // During combat or other phases, the overlay should be visible but without the count numbers
+            if (_state.InRecruitPhase || _settings.ManualBattlegroundsMode)
+            {
+                // Shop labels (1, 2, 3, ...)
+                var effectiveShop = Math.Max(1, _state.ShopCount);
+                var shop = ShopAnchors(effectiveShop);
+                for (int i = 0; i < shop.Length; i++)
+                    AddLabel((i + 1).ToString(), shop[i].X, shop[i].Y);
 
-            // Board labels (A, B, C, ... or 1, 2, 3, ... - let's use numbers for now)
-            var effectiveBoard = Math.Max(1, _state.BoardCount);
-            var board = BoardAnchors(effectiveBoard);
-            for (int i = 0; i < board.Length; i++)
-                AddLabel((i + 1).ToString(), board[i].X, board[i].Y);
+                // Board labels (A, B, C, ... or 1, 2, 3, ... - let's use numbers for now)
+                var effectiveBoard = Math.Max(1, _state.BoardCount);
+                var board = BoardAnchors(effectiveBoard);
+                for (int i = 0; i < board.Length; i++)
+                    AddLabel((i + 1).ToString(), board[i].X, board[i].Y);
 
-            // Hand labels (1, 2, 3, ...)
-            var effectiveHand = Math.Max(1, _state.HandCount);
-            var hand = HandAnchors(effectiveHand);
-            for (int i = 0; i < hand.Length; i++)
-                AddLabel((i + 1).ToString(), hand[i].X, hand[i].Y);
+                // Hand labels (1, 2, 3, ...)
+                var effectiveHand = Math.Max(1, _state.HandCount);
+                var hand = HandAnchors(effectiveHand);
+                for (int i = 0; i < hand.Length; i++)
+                    AddLabel((i + 1).ToString(), hand[i].X, hand[i].Y);
+            }
         }
 
         private void AddLabel(string text, double x, double y)

@@ -11,6 +11,14 @@ namespace TavernTally
         {
             try
             {
+                // Check for test mode
+                if (args.Contains("--test"))
+                {
+                    Console.WriteLine("Running TavernTally Phase Detection Tests...");
+                    TavernTally.Tests.PhaseDetectionTests.RunTests();
+                    return;
+                }
+
                 // Check for development restart flag
                 bool isDevRestart = args.Contains("--dev-restart") || 
                                    System.IO.File.Exists(System.IO.Path.Combine(System.IO.Path.GetTempPath(), "TavernTally.DevRestart.flag"));
